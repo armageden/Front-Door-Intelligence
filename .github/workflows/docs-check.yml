@@ -1,0 +1,52 @@
+name: docs-check
+
+# Validates that the documentation still matches the working tree.
+#
+# The command is not hardcoded here: it is read from the contract at
+# docs/.docsrc.json (commands.docsCheck), so the workflow and the documented
+# command cannot drift apart. When a package manager is adopted and that command
+# becomes `npm run docs:check`, this workflow follows automatically.
+#
+# This validator is dependency-free plain Node, so there is no install step.
+# It runs on every push and pull request and blocks on failure.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  docs-check:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # The validator uses only node: built-ins, so any supported version works.
+        # The matrix exists so a change that breaks one version cannot hide behind
+        # another. Widen this when the project adopts a package manager.
+        node-version: ['22', '24']
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: Read the docs:check command from the contract
+        id: contract
+        run: |
+          CMD="$(node -p "require('./docs/.docsrc.json').commands.docsCheck.run")"
+          if [ -z "$CMD" ]; then
+            echo "::error::commands.docsCheck.run is not set in docs/.docsrc.json"
+            exit 1
+          fi
+          echo "run=$CMD" >> "$GITHUB_OUTPUT"
+          echo "Using: $CMD"
+
+      - name: Validate documentation structure
+        run: ${{ steps.contract.outputs.run }}

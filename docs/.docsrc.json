@@ -1,0 +1,288 @@
+{
+  "$comment": [
+    "THE docs contract. Single source of truth for the documentation system.",
+    "Every other artefact — AGENTS.md, the docs-updater runbook, the how-to recipes,",
+    "and scripts/docs-check.mjs — reads this file rather than hardcoding paths,",
+    "commands, or subject layout. If reality disagrees with this file, fix this file",
+    "and say why. Do not work around it in a consumer.",
+    "",
+    "Subject IDs are stable: once assigned, never reused, never renumbered. Folder",
+    "names may be renamed ONLY together with an edit to this file."
+  ],
+
+  "contractVersion": 1,
+  "appliesTo": "Front Door Intelligence",
+
+  "repo": {
+    "root": ".",
+    "remote": "https://github.com/armageden/Front-Door-Intelligence.git",
+    "branch": "main",
+    "shape": "single-package",
+    "workspaces": [],
+    "commitCount": 1
+  },
+
+  "packageManager": {
+    "detected": false,
+    "name": null,
+    "binary": null,
+    "evidence": [
+      "No package.json.",
+      "No lockfile: package-lock.json, pnpm-lock.yaml, yarn.lock, bun.lock, bun.lockb all absent.",
+      "No pyproject.toml, go.mod, Cargo.toml, Gemfile, pom.xml, build.gradle,",
+      "composer.json, deno.json, deno.jsonc, mix.exs, or build.sbt.",
+      "ARCHITECTURE.md §9.1 shows `npm install`. That is a plan in a specification,",
+      "not a detection, so no package manager may be assumed."
+    ]
+  },
+
+  "runtimes": {
+    "declaredByRepo": [],
+    "declaredByRepoNote": "The repository declares no runtime. The two spec documents describe a planned TypeScript/AWS SAM system that does not exist yet.",
+    "availableOnMachine": [
+      { "name": "node", "version": "v22.23.3" },
+      { "name": "npm", "version": "12.1.0" },
+      { "name": "pnpm", "version": "11.13.1" },
+      { "name": "yarn", "version": "1.22.22" }
+    ],
+    "bun": "not installed",
+    "docsCheckRuntime": {
+      "name": "node",
+      "version": ">=18",
+      "justification": "scripts/docs-check.mjs is dependency-free plain Node ES modules using only node: built-ins, so it runs on a clean checkout with no install step. The repository has no manifest and no toolchain to compile a TypeScript variant, so a .ts validator could not be run today. Rename to .ts once a package manager and build tool exist."
+    }
+  },
+
+  "buildTools": {
+    "detected": false,
+    "checked": [
+      "Makefile", "justfile", "Justfile", "Taskfile.yml", "Taskfile.yaml",
+      "CMakeLists.txt", "samconfig.toml"
+    ],
+    "note": "ARCHITECTURE.md §8.3 plans `sam build && sam deploy --guided`. No template.yaml or samconfig.toml exists, so there is nothing to build."
+  },
+
+  "commands": {
+    "docsCheck": {
+      "status": "available",
+      "run": "node scripts/docs-check.mjs",
+      "binary": "node",
+      "args": ["scripts/docs-check.mjs"]
+    },
+    "dev": {
+      "status": "unavailable",
+      "run": null,
+      "reason": "No manifest, no template.yaml, no handlers. ARCHITECTURE.md §9.1 plans `sam local start-api`; there is nothing to serve."
+    },
+    "build": {
+      "status": "unavailable",
+      "run": null,
+      "reason": "No build tool and no SAM template. ARCHITECTURE.md §8.3 plans `sam build`."
+    },
+    "test": {
+      "status": "unavailable",
+      "run": null,
+      "reason": "No test runner, no manifest script, no test files. ARCHITECTURE.md §11 plans test/handlers.test.ts."
+    },
+    "lint": {
+      "status": "unavailable",
+      "run": null,
+      "reason": "No linter installed or configured, and no source to lint."
+    },
+    "typecheck": {
+      "status": "unavailable",
+      "run": null,
+      "reason": "No tsconfig.json and no TypeScript installed."
+    },
+    "format": {
+      "status": "unavailable",
+      "run": null,
+      "reason": "No formatter, no config file."
+    }
+  },
+
+  "paths": {
+    "docsRoot": "docs",
+    "howToDir": "docs/00-how-to",
+    "contractFile": "docs/.docsrc.json",
+    "sourceRoots": [],
+    "sourceRootsNote": "Empty. There is no source root because there is no code. Filled in when the first subsystem lands; Rule 3 depends on it.",
+    "routeGlobs": [],
+    "handlerGlobs": [],
+    "routeGlobsNote": "Empty for the same reason. The validator reports reverse coverage as NOT APPLICABLE rather than passing while these are empty.",
+    "excludeGlobs": [
+      "**/node_modules/**",
+      "dist/**",
+      "build/**",
+      "coverage/**",
+      "**/*.test.*",
+      "**/*.spec.*",
+      "**/fixtures/**",
+      "**/__fixtures__/**",
+      "**/migrations/**"
+    ],
+    "excludeGlobsNote": "Inert until code lands. Fixtures and generated output are excluded from reverse coverage because they are inputs, not surface. Migrations are excluded by default; flip this if the project later wants migrations documented individually."
+  },
+
+  "pathVerification": {
+    "$comment": "Drives check 1. Decides which backticked tokens in docs are assertions about real files.",
+    "roots": ["docs", "scripts", ".claude", ".github"],
+    "projectFiles": ["prd.md", "ARCHITECTURE.md", "AGENTS.md", "CLAUDE.md"],
+    "extensions": [
+      ".md", ".mjs", ".cjs", ".ts", ".tsx", ".js", ".jsx", ".json",
+      ".yml", ".yaml", ".toml", ".sh", ".html", ".css", ".sql"
+    ],
+    "extensionless": ["LICENSE", "LICENCE", "README", "Makefile", "Dockerfile", "Procfile", ".gitignore"],
+    "basenameFallback": true,
+    "basenameFallbackNote": "A bare filename with no slash, e.g. 00-overview.md, is satisfied by any file of that name in the repo. This lets docs cite a filename pattern without pinning one subject folder.",
+    "docFilesScanned": ["AGENTS.md", "CLAUDE.md", "docs/**/*.md"],
+    "secretsAlsoScan": ["prd.md", "ARCHITECTURE.md"],
+    "secretsAlsoScanNote": "Secret and absolute-path scanning is wider than path-existence scanning. The two spec documents are inputs, not documentation, so path assertions in them are not this system's business — but a pasted credential in them still is. Their .env.example block is placeholder-valued, so it does not trip the generic check."
+  },
+
+  "markers": {
+    "expectAbsent": "<!-- docs-check:expect-absent",
+    "skipPlanned": "<!-- docs-check:skip planned -->",
+    "skipPlannedEnd": "<!-- docs-check:skip end -->",
+    "expectAbsentNote": "A self-invalidating declaration that a named path does not exist yet. Check 1 fails the declaration itself once the file is created, so a blind spot cannot rot. A live skipPlanned region is exempt from validation but every path inside it is printed in the run summary."
+  },
+
+  "provenance": {
+    "$comment": "Drives check 8. Every sub-file must declare what it was verified against.",
+    "requireLine": true,
+    "linePatterns": ["**Verified against:**", "**Source:**"],
+    "rule": "State the file and section, and where possible the symbol. If a claim rests on a specification rather than on code, say so explicitly and mark it unverified against code. Never imply a symbol exists when no code exists."
+  },
+
+  "secrets": {
+    "$comment": "Drives check 6. High-confidence provider token shapes plus generic credential assignments.",
+    "placeholderHints": [
+      "your_", "your-", "xxx", "example", "placeholder", "redacted", "changeme",
+      "todo", "abc123", "xyz789", "sample", "dummy", "fake", "<", "..."
+    ],
+    "providerPatterns": [
+      { "name": "AWS access key id", "regex": "\\b(ACIA|ASIA|AKIA|ABIA|ACCA)[0-9A-Z]{16}\\b" },
+      { "name": "GitHub token", "regex": "\\b(ghp|gho|ghu|ghs|ghr|github_pat)_[A-Za-z0-9_]{20,}" },
+      { "name": "Slack token", "regex": "\\bxox[abposr]-[A-Za-z0-9-]{10,}" },
+      { "name": "Slack webhook", "regex": "https://hooks\\.slack\\.com/services/T[A-Za-z0-9_/]{20,}" },
+      { "name": "Stripe live key", "regex": "\\bsk_live_[A-Za-z0-9]{16,}" },
+      { "name": "Google API key", "regex": "\\bAIza[0-9A-Za-z_-]{35}\\b" },
+      { "name": "Anthropic key", "regex": "\\bsk-ant-[A-Za-z0-9_-]{20,}" },
+      { "name": "OpenAI key", "regex": "\\bsk-(?!ant-)[A-Za-z0-9]{32,}" },
+      { "name": "npm token", "regex": "\\bnpm_[A-Za-z0-9]{30,}" },
+      { "name": "HuggingFace token", "regex": "\\bhf_[A-Za-z0-9]{30,}" },
+      { "name": "JWT", "regex": "\\beyJ[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]{8,}" },
+      { "name": "private key block", "regex": "-----BEGIN (RSA |EC |OPENSSH |PGP )?PRIVATE KEY-----" }
+    ],
+    "genericAssignment": {
+      "$comment": "The leading (?<![A-Za-z0-9]) instead of \\b is deliberate: \\b does not fire between _ and C because both are word characters, so prefixed forms like RING_CLIENT_SECRET= were missed entirely.",
+      "regex": "(?i)(?<![A-Za-z0-9])(api[_-]?key|secret[_-]?key|client[_-]?secret|client[_-]?id|access[_-]?token|auth[_-]?token|private[_-]?key|password|passwd|credential)s?(?![A-Za-z0-9])\\s*[:=]\\s*[\"']?([A-Za-z0-9+/=_.-]{12,})",
+      "requireMixedEntropy": true,
+      "mixedEntropyRule": "The captured value must contain at least one uppercase, one lowercase, and one digit, and be at least 16 characters, and must not match a placeholder hint."
+    }
+  },
+
+  "absolutePathPrefixes": {
+    "$comment": "Drives check 7. Absolute local filesystem paths leak a developer's machine into shared docs.",
+    "prefixes": [
+      "/Users/",
+      "/home/",
+      "/Volumes/",
+      "/private/var/folders/",
+      "/mnt/",
+      "C:\\",
+      "C:/",
+      "D:\\"
+    ]
+  },
+
+  "subjects": [
+    {
+      "id": "how-to",
+      "order": 0,
+      "folder": "00-how-to",
+      "title": "How-to",
+      "covers": "Task-first recipes for the recurring change types in this repository",
+      "readWhen": "You know what you want to do and need the exact steps. Doing a task? Start here."
+    },
+    {
+      "id": "product",
+      "order": 1,
+      "folder": "01-product",
+      "title": "Product requirements",
+      "covers": "FR1-FR18, NFR1-NFR7, success metrics, and the submission checklist",
+      "readWhen": "You need to know what the product must do, or which requirement ID to cite"
+    },
+    {
+      "id": "architecture",
+      "order": 2,
+      "folder": "02-architecture",
+      "title": "Technical architecture",
+      "covers": "Pipeline components, API contracts, data store, security, and design decisions",
+      "readWhen": "You need the technical design, a wire format, or the reasoning behind a decision"
+    },
+    {
+      "id": "repository",
+      "order": 3,
+      "folder": "03-repository",
+      "title": "The repository",
+      "covers": "What exists on disk, the toolchain, check commands, and the planned structure",
+      "readWhen": "Before you assume any file, script, or command exists"
+    }
+  ],
+
+  "subjectsNote": "Order is reading priority, not creation order. Numbers are NN prefixes on folder names and must match the order value. The validator fails if a docs/NN-* folder has no entry here, or if an entry here has no folder, or if NN disagrees with order. That is what makes silent renumbering impossible.",
+
+  "reverseCoverage": {
+    "intentionallyUndocumented": [],
+    "intentionallyUndocumentedNote": "Entries are { path, reason }. A matching file is exempted from reverse coverage with the reason printed in the run summary. Keep this list empty unless a file genuinely should not be described."
+  },
+
+  "agent": {
+    "docsUpdater": ".claude/agents/docs-updater.md",
+    "docsUpdaterNote": "The canonical docs-sync runbook. Single source of truth for the process. Human-readable mirror is docs/00-how-to/04-run-a-docs-sync-pass.md. If one changes, change both."
+  },
+
+  "aiConfig": {
+    "canonical": "AGENTS.md",
+    "mirrors": [
+      { "path": "CLAUDE.md", "relationship": "pointer only — no duplicated text" }
+    ]
+  },
+
+  "docsIndexes": [
+    "AGENTS.md",
+    "docs/00-how-to/00-overview.md"
+  ],
+  "docsIndexesNote": "Every subject folder must be reachable from each of these, by literal path or by a link that resolves into it. This is what stops a subject from being declared in the contract and in the docs tree while being invisible to the agent that reads the router first.",
+
+  "ci": {
+    "provider": "github-actions",
+    "detectedFrom": "origin remote is github.com; .github/workflows/ is the only workflow directory",
+    "workflows": [
+      {
+        "path": ".github/workflows/docs-check.yml",
+        "jobs": ["docs-check"],
+        "matrixAxes": ["node-version"],
+        "matrixValues": ["22", "24"],
+        "runsDocsCheck": true
+      }
+    ]
+  },
+
+  "gitHooks": {
+    "system": null,
+    "coreHooksPath": null,
+    "checked": [".githooks", ".husky", "lefthook.yml", ".pre-commit-config.yaml", ".git/hooks/pre-commit"],
+    "status": "No hook system of any kind. .git/hooks exists but is empty; core.hooksPath is unset.",
+    "advisoryWarning": "Skipped deliberately. The prompt conditions the advisory drift warning on an existing hook system, and none exists. Introducing husky, lefthook, or a pre-commit framework purely to carry a warning would change the repository's hook posture without being asked. When a hook system appears, prepend a warning that prints the validator output and never alters the existing exit code.",
+    "ciIsTheGate": true
+  },
+
+  "limitations": [
+    "This contract records discovered reality as of the commit it was written against. It is a description, not an enforcement of the build.",
+    "docs-check proves document structure, not truth. It cannot confirm that a documented auth requirement, status code, parameter, or behaviour matches the handler, because it does not read semantics. A passing docs-check is never evidence that the docs are correct.",
+    "Reverse coverage is NOT APPLICABLE while routeGlobs and handlerGlobs are empty, and the validator says so rather than reporting a pass.",
+    "The specification subjects describe a system that has not been built. Claims sourced from prd.md or ARCHITECTURE.md are verified against those documents and are explicitly NOT verified against code."
+  ]
+}
