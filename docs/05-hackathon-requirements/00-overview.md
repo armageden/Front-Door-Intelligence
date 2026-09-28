@@ -28,6 +28,7 @@ instead.
 | [03-doc-conflicts](./03-doc-conflicts.md) | Every place `prd.md` or `ARCHITECTURE.md` misstates a requirement, with the rule text on the left and the document on the right |
 | [04-ring-api-findings](./04-ring-api-findings.md) | What the real Ring API does: webhook signing confirmed, payload contract wrong in 6 of 9 fields, snapshot call wrong, mandatory watermark, E2EE blocker, no webhook sandbox |
 | [05-fire-tv-vega-findings](./05-fire-tv-vega-findings.md) | What Vega OS can and cannot do: a third-party-video overlay is not available, RN `zIndex` does not work over video, and the keystrokes a dismiss button needs |
+| [06-hackathon-resources](./06-hackathon-resources.md) | The Resources page as a catalogue of leads — the Devices Builder Tools that could reopen D021, the Fire OS option that D021 is conditional on, the canonical Ring starter never compared against, and a free Ring account as a verification path. **Not a rules source, and no link was fetched** |
 
 ## How to read a conflict
 

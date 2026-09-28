@@ -26,7 +26,7 @@ Specified in `prd.md` and `ARCHITECTURE.md`.
 
 | Field | Value |
 |---|---|
-| **Status** | **Three stages implemented, no front end.** Ingress, describe, and overlay delivery are written and tested against fakes. No live AWS call has ever run. |
+| **Status** | **Four stages implemented, no front end.** Ingress, describe, overlay delivery, and the event query are written and tested against fakes. No live AWS call has ever run. |
 | **Language** | TypeScript `^7.0.2`, strict, ES2022, CommonJS output |
 | **Framework** | AWS serverless — Lambda, API Gateway, DynamoDB, S3, SQS, Bedrock, via SAM. Never deployed. |
 | **Package manager** | **npm** (12.1.0), lockfile `package-lock.json`. Chosen because `ARCHITECTURE.md` §9.1 specifies `npm install`, and npm resolves workspaces natively for the planned `firetv/` and `web/` packages. |
@@ -42,7 +42,7 @@ Verbatim from the contract's `commands` block. **All of the first six run and pa
 | **everything** | `npm run all` | typecheck + test + build:verify + docs:check, in order |
 | **docs:check** | `npm run docs:check` | available |
 | **typecheck** | `npm run typecheck` | available — `tsc --noEmit`, covers `test/` too |
-| **test** | `npm test` | available — vitest, 150 tests across 8 files |
+| **test** | `npm test` | available — vitest, 172 tests across 9 files |
 | **test:coverage** | `npm run test:coverage` | available — the only mechanical metric in the repo |
 | **build** | `npm run build` | available — esbuild bundles each handler into `dist/` |
 | **build:verify** | `npm run build:verify` | available — asserts `dist/` is self-contained |
@@ -66,8 +66,8 @@ subject's `order`; the validator fails otherwise.
 | [`docs/02-architecture/`](./docs/02-architecture/00-overview.md) | Pipeline design, API contracts, data store, security, decisions D001–D021 | You need the design intent or the reasoning behind a decision |
 | [`docs/03-repository/`](./docs/03-repository/00-overview.md) | What exists on disk, the toolchain, check commands, the planned structure | **Before you assume any file, script, or command exists** |
 | [`docs/04-libraries/`](./docs/04-libraries/00-overview.md) | Real exported APIs of the seven modules under `src/lib/` | You need a module's actual signature, return shape, or failure modes |
-| [`docs/05-hackathon-requirements/`](./docs/05-hackathon-requirements/00-overview.md) | The Devpost rules, the Ring API, and where the project docs conflict with both | You need to know what is worth points, or whether a document makes a claim the sources do not support |
-| [`docs/06-handlers/`](./docs/06-handlers/00-overview.md) | The three implemented Lambda handlers under `src/handlers/` | You are changing a handler or tracing an event through the pipeline |
+| [`docs/05-hackathon-requirements/`](./docs/05-hackathon-requirements/00-overview.md) | The Devpost rules, the Ring API, the resource leads, and where the project docs conflict with both | You need to know what is worth points, whether a document makes a claim the sources do not support, or where the tooling and samples are |
+| [`docs/06-handlers/`](./docs/06-handlers/00-overview.md) | The four implemented Lambda handlers under `src/handlers/` | You are changing a handler or tracing an event through the pipeline |
 
 Each subject folder opens with a `00-overview.md` carrying the subject name, folder
 path, a "read this when" purpose, and a table of contents. Every other file backlinks
