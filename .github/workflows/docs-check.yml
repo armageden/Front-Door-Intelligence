@@ -1,14 +1,15 @@
-name: docs-check
+name: checks
 
-# Validates that the documentation still matches the working tree.
+# Runs every gate that is marked "available" in the docs contract at
+# docs/.docsrc.json: typecheck, test, and docs:check.
 #
-# The command is not hardcoded here: it is read from the contract at
-# docs/.docsrc.json (commands.docsCheck), so the workflow and the documented
-# command cannot drift apart. When a package manager is adopted and that command
-# becomes `npm run docs:check`, this workflow follows automatically.
+# Commands are not hardcoded here. Each step reads its command from
+# commands.<name>.run in the contract, so the workflow and the documented
+# commands cannot drift apart. When a command changes in the contract, this
+# workflow follows with no edit.
 #
-# This validator is dependency-free plain Node, so there is no install step.
-# It runs on every push and pull request and blocks on failure.
+# Steps whose contract status is "unavailable" are deliberately absent rather than
+# stubbed — a command that cannot run should not be here.
 
 on:
   push:
@@ -20,14 +21,13 @@ permissions:
   contents: read
 
 jobs:
-  docs-check:
+  checks:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        # The validator uses only node: built-ins, so any supported version works.
-        # The matrix exists so a change that breaks one version cannot hide behind
-        # another. Widen this when the project adopts a package manager.
+        # The contract requires Node >= 20. The matrix exists so a change that
+        # breaks one supported version cannot hide behind another.
         node-version: ['22', '24']
 
     steps:
@@ -36,17 +36,32 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
+          cache: npm
 
-      - name: Read the docs:check command from the contract
-        id: contract
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Read gate commands from the contract
+        id: gates
         run: |
-          CMD="$(node -p "require('./docs/.docsrc.json').commands.docsCheck.run")"
-          if [ -z "$CMD" ]; then
-            echo "::error::commands.docsCheck.run is not set in docs/.docsrc.json"
-            exit 1
-          fi
-          echo "run=$CMD" >> "$GITHUB_OUTPUT"
-          echo "Using: $CMD"
+          node -e '
+            const c = require("./docs/.docsrc.json");
+            const names = ["typecheck", "test", "docsCheck"];
+            for (const n of names) {
+              const cmd = c.commands[n];
+              if (!cmd || cmd.status !== "available" || !cmd.run) {
+                console.error(`::error::commands.${n} is not "available" in the contract`);
+                process.exit(1);
+              }
+              console.log(`${n}=${cmd.run}`);
+            }
+          ' >> "$GITHUB_OUTPUT"
+
+      - name: Typecheck
+        run: ${{ steps.gates.outputs.typecheck }}
+
+      - name: Test
+        run: ${{ steps.gates.outputs.test }}
 
       - name: Validate documentation structure
-        run: ${{ steps.contract.outputs.run }}
+        run: ${{ steps.gates.outputs.docsCheck }}

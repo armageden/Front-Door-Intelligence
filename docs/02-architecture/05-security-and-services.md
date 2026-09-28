@@ -2,8 +2,6 @@
 
 **Verified against:** `ARCHITECTURE.md` §6 and §7, read directly. The Kiro Crew note was checked against both §7 and §15.
 
-<!-- docs-check:expect-absent .env.example -->
-
 # Security and AWS services
 
 Source: `ARCHITECTURE.md` §6 and §7. All mitigations below are **specified, not

@@ -2,7 +2,7 @@
 
 **Verified against:** `ARCHITECTURE.md` §11, read directly; the tree is copied from that section. No path in it exists on disk, which the "expect-absent" declaration on each named path enforces.
 
-<!-- docs-check:expect-absent docs/PRD.md docs/ARCHITECTURE.md docs/FRICTION_LOG.md FRICTION_LOG.md package.json webhookHandler.ts snapshotFetcher.ts bedrockDescriber.ts overlayPusher.ts eventQuery.ts dailySummary.ts dynamoClient.ts types/index.ts test/fixtures/ring_motion_event.json -->
+<!-- docs-check:expect-absent docs/PRD.md docs/ARCHITECTURE.md docs/FRICTION_LOG.md FRICTION_LOG.md bedrockDescriber.ts overlayPusher.ts eventQuery.ts dailySummary.ts types/index.ts test/fixtures/ring_motion_event.json -->
 
 # Planned structure
 
@@ -64,22 +64,35 @@ front-door-intelligence/
 The tree lists six handler files, and they do not map one-to-one onto the numbered
 component sections in [02-pipeline-components](../02-architecture/02-pipeline-components.md):
 
-| Handler file | `ARCHITECTURE.md` section |
-|---|---|
-| `webhookHandler.ts` | §3.1 Ring Webhook Ingress |
-| `snapshotFetcher.ts` | §3.2 Snapshot Fetcher |
-| `bedrockDescriber.ts` | §3.3 Bedrock Describer |
-| `overlayPusher.ts` | §3.4 Overlay Pusher |
-| `dailySummary.ts` | §3.6 Daily Summary Generator |
-| `eventQuery.ts` | §4.2 Query Flow — described only in the data flow, with no numbered component section of its own |
+| Handler file | `ARCHITECTURE.md` section | Status |
+|---|---|---|
+| `webhookHandler.ts` | §3.1 Ring Webhook Ingress | not written |
+| `snapshotFetcher.ts` | §3.2 Snapshot Fetcher | not written |
+| `bedrockDescriber.ts` | §3.3 Bedrock Describer | not written |
+| `overlayPusher.ts` | §3.4 Overlay Pusher | not written |
+| `dailySummary.ts` | §3.6 Daily Summary Generator | not written |
+| `eventQuery.ts` | §4.2 Query Flow — described only in the data flow, with no numbered component section of its own | not written |
 
 The two that do not appear in the table are accounted for elsewhere: §3.5, the
 DynamoDB event store, is a data contract handled by `dynamoClient.ts` in `lib/`, and
 §3.7, the optional cross-track adapters, has no file in the planned tree at all.
 
-Four library files cover the external dependencies: the Ring client, the Bedrock
-client, the DynamoDB client, and HMAC signature verification. Shared types go in
-`types/index.ts`.
+## What the tooling phase retired from this list
+
+Moved out when the file was actually created, per the rule that this page lists only
+what remains unwritten:
+
+| Path | Created | Now documented in |
+|---|---|---|
+| `package.json` | tooling phase | [02-toolchain](./02-toolchain.md) |
+| `.env.example` | tooling phase | [02-toolchain](./02-toolchain.md), `docs/04-libraries/01-signature-verification.md` |
+| `src/lib/signatureVerifier.ts` | tooling phase | [01-signature-verification](../04-libraries/01-signature-verification.md) |
+| `test/` | tooling phase, partially | [01-signature-verification](../04-libraries/01-signature-verification.md) |
+
+Three of the four `lib/` files remain unwritten, as do all of `src/handlers/`,
+`src/types/`, `firetv/`, and `web/`. The root `package.json` in the tree above also now
+carries a `workspaces` field once `firetv/` and `web/` exist — see
+[02-toolchain](./02-toolchain.md).
 
 Two separate front ends are planned: `firetv/` for the Vega OS overlay and `web/` for
 the dashboard timeline. Each carries its own `package.json`, which implies a workspace

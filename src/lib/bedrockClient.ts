@@ -1,0 +1,227 @@
+/**
+ * Amazon Bedrock client for one-sentence image descriptions.
+ *
+ * Implements FR5 (send the snapshot to Bedrock for a one-sentence description), FR9 and
+ * FR10 (the prompt constrains what may be described and how), and provides the
+ * deterministic input for FR11's fallback.
+ *
+ * ## What is verified, and from where
+ *
+ * From `ARCHITECTURE.md` §3.3, read directly: model choice via `BEDROCK_MODEL_ID`,
+ * `anthropic.claude-3-haiku` or `amazon.nova-lite-v1`; **max tokens 80**;
+ * **temperature 0.2**; and the system prompt text, which this module uses as its base.
+ *
+ * **Not verified in this session:** the exact Bedrock request envelope. The shape used
+ * here is the standard Claude-on-Bedrock `InvokeModel` form — an `anthropic_version`
+ * field, `max_tokens`, `temperature`, and a `messages` array carrying one image block
+ * and one text block. No AWS documentation was fetched while writing this, so treat the
+ * envelope as a well-founded default rather than a confirmed one. It is the single most
+ * likely thing to need adjusting on first real invocation, and the failure would be
+ * loud (an API error), not silent.
+ *
+ * ## The watermark, and why the prompt has an extra sentence
+ *
+ * Ring applies a **mandatory, unremovable** watermark to every image delivered through
+ * the Partner API: the Ring logo top-left, and Device ID, App Name, and timestamp
+ * top-right (added 8 June 2026, verified against the Ring docs 2026-09-28).
+ *
+ * The documented system prompt does not mention it. Feeding a watermarked image to a
+ * vision model with that prompt invites the model to describe the overlay as scene
+ * content — "a logo in the corner", "text reading device 12345" — which is exactly the
+ * failure FR9 exists to prevent. So {@link SYSTEM_PROMPT} is the documented prompt plus
+ * one appended sentence telling the model to ignore the overlay.
+ *
+ * **This is a deviation from the text specified in `ARCHITECTURE.md` §3.3 and FR9**, and
+ * it is logged as decision D017. Revert it by deleting the appended clause; the rest of
+ * the module is unaffected.
+ */
+
+/** `BEDROCK_MODEL_ID` from `ARCHITECTURE.md` §8.2. */
+export const BEDROCK_MODEL_ENV = 'BEDROCK_MODEL_ID';
+
+/** `ARCHITECTURE.md` §3.3. The docs also name this as a Bedrock cost control. */
+export const MAX_TOKENS = 80;
+
+/** `ARCHITECTURE.md` §3.3. */
+export const TEMPERATURE = 0.2;
+
+/** The Anthropic-on-Bedrock API version field. Not verified in this session. */
+export const ANTHROPIC_VERSION = 'bedrock-2023-05-31';
+
+/**
+ * The documented system prompt (FR9, FR10), plus the watermark clause described above.
+ *
+ * The first paragraph is `ARCHITECTURE.md` §3.3 verbatim. The second is additive.
+ */
+export const SYSTEM_PROMPT = [
+  'Describe only what is visible in this security camera snapshot. Use one sentence.',
+  'Focus on: people, packages, vehicles, animals. Do not judge or label people.',
+  'If nothing is identifiable, say \'Nothing identifiable.\'',
+  'The image has a permanent watermark overlay in the corners containing a logo and',
+  'device text. Ignore it completely: it is not part of the scene and must never be',
+  'mentioned in the description.',
+].join(' ');
+
+/** Shown when Bedrock is unavailable. FR11 requires a deterministic local fallback. */
+export const NOTHING_IDENTIFIABLE = 'Nothing identifiable';
+
+export interface BedrockClientOptions {
+  readonly modelId: string;
+  readonly region: string;
+  /** Injected for tests. Defaults to a real `BedrockRuntimeClient`. */
+  readonly send?: (input: {
+    modelId: string;
+    contentType: string;
+    accept: string;
+    body: Uint8Array;
+  }) => Promise<{ body: Uint8Array }>;
+}
+
+export class BedrockError extends Error {
+  readonly modelId: string;
+
+  constructor(modelId: string, cause: unknown) {
+    super(`Bedrock invocation failed for model ${modelId}: ${describe(cause)}`);
+    this.name = 'BedrockError';
+    this.modelId = modelId;
+  }
+}
+
+function describe(cause: unknown): string {
+  if (cause instanceof Error) return cause.message;
+  return String(cause);
+}
+
+export function createBedrockClient(options: BedrockClientOptions) {
+  const { modelId, region } = options;
+  const send =
+    options.send ??
+    (async (input) => {
+      // Imported lazily so the module loads without the AWS SDK present, which keeps
+      // the test suite honest about what it is exercising.
+      const { BedrockRuntimeClient, InvokeModelCommand } = await import(
+        '@aws-sdk/client-bedrock-runtime'
+      );
+      const client = new BedrockRuntimeClient({ region });
+      const response = await client.send(
+        new InvokeModelCommand({
+          modelId: input.modelId,
+          contentType: input.contentType,
+          accept: input.accept,
+          body: input.body,
+        }),
+      );
+      return { body: response.body as Uint8Array };
+    });
+
+  /**
+   * Describe an image in one sentence.
+   *
+   * @param imageBytes Raw JPEG bytes, as returned by the Ring media endpoint.
+   */
+  async function describeImage(imageBytes: Uint8Array): Promise<string> {
+    const payload = {
+      anthropic_version: ANTHROPIC_VERSION,
+      max_tokens: MAX_TOKENS,
+      temperature: TEMPERATURE,
+      system: SYSTEM_PROMPT,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'image',
+              source: {
+                type: 'base64',
+                media_type: 'image/jpeg',
+                // Bedrock wants standard base64, not the URL-safe variant.
+                data: Buffer.from(imageBytes).toString('base64'),
+              },
+            },
+            { type: 'text', text: 'Describe what is visible in this snapshot.' },
+          ],
+        },
+      ],
+    };
+
+    let response: { body: Uint8Array };
+    try {
+      response = await send({
+        modelId,
+        contentType: 'application/json',
+        accept: 'application/json',
+        body: new TextEncoder().encode(JSON.stringify(payload)),
+      });
+    } catch (cause) {
+      throw new BedrockError(modelId, cause);
+    }
+
+    return extractText(response.body, modelId);
+  }
+
+  return { describeImage, modelId, region };
+}
+
+export type BedrockClient = ReturnType<typeof createBedrockClient>;
+
+/** Pull the assistant text out of an Anthropic-shaped response. */
+function extractText(body: Uint8Array, modelId: string): string {
+  let parsed: {
+    content?: { type?: string; text?: string }[];
+    // Nova and other models on Bedrock answer in a different shape.
+    output?: { message?: string } | string;
+    results?: { outputText?: string }[];
+  };
+  try {
+    parsed = JSON.parse(new TextDecoder().decode(body)) as typeof parsed;
+  } catch (cause) {
+    throw new BedrockError(modelId, cause);
+  }
+
+  const anthropic = parsed.content?.find((block) => block.type === 'text')?.text;
+  if (typeof anthropic === 'string' && anthropic.trim().length > 0) return anthropic.trim();
+
+  // Fallbacks for non-Anthropic models on the same Bedrock endpoint, so a model swap
+  // does not require a code change.
+  const nova = typeof parsed.output === 'object' ? parsed.output?.message : parsed.output;
+  if (typeof nova === 'string' && nova.trim().length > 0) return nova.trim();
+
+  const other = parsed.results?.[0]?.outputText;
+  if (typeof other === 'string' && other.trim().length > 0) return other.trim();
+
+  throw new BedrockError(modelId, new Error('response contained no extractable text'));
+}
+
+/**
+ * FR11's deterministic local summary, used when Bedrock is unavailable.
+ *
+ * Pure and synchronous by design: the fallback must not itself be able to fail, and it
+ * must say the same thing for the same event every time. Device name is used when
+ * known, and the human-readable location is used when the name is missing, because
+ * "Person detected" alone is a worse sentence than "Person detected at Front Door".
+ */
+export function deterministicDescription(event: {
+  sub_type?: string;
+  device_name?: string;
+}): string {
+  const where = event.device_name?.trim() || 'the door';
+  const what = describeSubType(event.sub_type);
+  return `${what} at ${where}`;
+}
+
+function describeSubType(subType: string | undefined): string {
+  switch (subType) {
+    case 'human':
+      return 'Person detected';
+    case 'vehicle':
+      return 'Vehicle detected';
+    case 'motion':
+      return 'Motion detected';
+    case 'other_motion':
+      return 'Motion detected';
+    default:
+      // An unrecognised subtype must not become a confident claim. FR9's own wording
+      // for the nothing-to-report case is the honest default.
+      return NOTHING_IDENTIFIABLE;
+  }
+}

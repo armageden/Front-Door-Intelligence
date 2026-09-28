@@ -4,10 +4,28 @@
 
 # API contracts
 
+> ## 🔴 This contract is WRONG against the real Ring API
+>
+> Verified against `https://developer.amazon.com/docs/ring/api-documentation.html` on
+> 2026-09-28. **The payload below is wrong in 6 of 9 fields** and the snapshot call in
+> §3.2 of the architecture spec does not exist. The corrected facts are in
+> [04-ring-api-findings](../05-hackathon-requirements/04-ring-api-findings.md).
+>
+> The most dangerous single error: **webhook `sub_type` is flat** (`human`, `vehicle`,
+> `motion`, `other_motion`). The `motion.human` form below belongs to the *Event
+> History* query parameter — a different API surface. Code matching
+> `sub_type === "motion.human"` matches nothing, ever.
+>
+> This page deliberately still describes **`ARCHITECTURE.md` §5 as written**, because
+> rewriting the project's own spec is an author decision. Read it as a record of what
+> the spec says, not as a contract to implement.
+
+**Verified against:** `ARCHITECTURE.md` §5.1, §5.2, §9.2 and §3.5, read directly. Cross-checked against the official Ring API documentation — see the warning above. The contract below is the specification as written, not the real API.
+
 Source: `ARCHITECTURE.md` §5. Both endpoints are **specified, not implemented**.
 
-Two endpoints are defined. Anything else you find referenced elsewhere in the design —
-the optional MCP endpoint at `/mcp`, for example — is mentioned in passing by
+Two endpoints are defined. Anything else referenced elsewhere in the design — the
+optional MCP endpoint at `/mcp`, for example — is mentioned in passing by
 `ARCHITECTURE.md` §9.2 and has no contract here.
 
 ## `POST /webhook/ring`

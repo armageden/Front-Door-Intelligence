@@ -1,7 +1,5 @@
 # 00 — How-to
 
-<!-- docs-check:expect-absent package.json -->
-
 | Field | Value |
 |---|---|
 | **Layer** | How-to (task-first recipes) |
@@ -64,6 +62,9 @@ human-readable mirror of this rule is
 | Product requirements | [01-product](../01-product/00-overview.md) |
 | Technical architecture | [02-architecture](../02-architecture/00-overview.md) |
 | The repository itself | [03-repository](../03-repository/00-overview.md) |
+| Shared library modules under `src/lib/` | [04-libraries](../04-libraries/00-overview.md) |
+| Official hackathon rules and project-doc conflicts | [05-hackathon-requirements](../05-hackathon-requirements/00-overview.md) |
+| Lambda handlers under `src/handlers/` | [06-handlers](../06-handlers/00-overview.md) |
 
 ## Agent definition
 

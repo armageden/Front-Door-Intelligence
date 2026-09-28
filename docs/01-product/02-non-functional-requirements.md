@@ -2,7 +2,7 @@
 
 **Verified against:** `prd.md` §6, §9 and §10, read directly. Cross-references to `ARCHITECTURE.md` §3.5, §3.6, §6 and §13 confirmed against that file.
 
-<!-- docs-check:expect-absent .env.example README.md LICENSE -->
+<!-- docs-check:expect-absent README.md LICENSE -->
 
 # Non-functional requirements, metrics, constraints
 

@@ -201,6 +201,10 @@ function looksLikePath(token) {
 
 function pathExists(token) {
   const clean = token.replace(/#.*$/, '');
+  // Git's own directories are never project files. Verifying them couples a passing
+  // check to the presence of a .git directory, so an export without one fails for a
+  // reason that has nothing to do with the documentation.
+  if (clean === '.git' || clean.startsWith('.git/')) return true;
   if (PV.projectFiles.includes(clean)) return true;
   if (clean.includes('/')) {
     if (matchesAny(compiled(PV.roots), clean)) return existsSync(join(ROOT, clean));
@@ -447,7 +451,11 @@ for (const file of docFiles) {
 
 // ------------------------------------------------ check 5: reverse coverage
 
-const coverageGlobs = [...(C.paths.routeGlobs || []), ...(C.paths.handlerGlobs || [])];
+const coverageGlobs = [
+  ...(C.paths.routeGlobs || []),
+  ...(C.paths.handlerGlobs || []),
+  ...(C.paths.libGlobs || []),
+];
 const allowlist = C.reverseCoverage.intentionallyUndocumented || [];
 const allowSet = new Map(allowlist.map((e) => [e.path, e.reason]));
 
