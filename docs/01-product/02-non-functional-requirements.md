@@ -1,6 +1,6 @@
 **Back:** [00-overview](./00-overview.md)
 
-**Verified against:** `prd.md` §6, §9 and §10, read directly. Cross-references to `ARCHITECTURE.md` §3.5, §3.6, §6 and §13 confirmed against that file.
+**Verified against:** `prd.md` §6, §9 and §10, read directly. Cross-references to `ARCHITECTURE.md` §3.5, §3.6, §6 and §13 confirmed against that file. The status column was added on 2026-09-28 and every row read from the working tree — `template.yaml` for NFR1 and NFR7, `src/lib/dynamoClient.ts` for NFR2, `.env.example` and `.gitignore` for NFR3, and a `find` sweep for the two absent files. NFR4 and NFR5 remain self-invalidating: the `expect-absent` declaration at the top of this page fails the moment either file is created.
 
 <!-- docs-check:expect-absent README.md LICENSE -->
 
@@ -10,15 +10,15 @@ Source: `prd.md` §6 (NFR1–NFR7), §9 (success metrics), §10 (constraints).
 
 ## NFR1–NFR7
 
-| ID | Requirement | Enforced by (planned) |
-|---|---|---|
-| NFR1 | Webhook endpoint MUST return HTTP 200 within 5 seconds to avoid Ring retry storms | API Gateway + Lambda timeout config |
-| NFR2 | Webhook handling MUST be idempotent — duplicate `request_id` values MUST not create duplicate events | `IdempotencyTable` with 24h TTL |
-| NFR3 | All API keys and tokens MUST be stored as environment variables, never committed to the repository | `.env.example` + gitignore |
-| NFR4 | The public GitHub repository MUST include an MIT License visible in the About section | `LICENSE` at repo root |
-| NFR5 | The README MUST include complete setup instructions so judges can run the project locally | `README.md` |
-| NFR6 | The demo video MUST be under 3 minutes, leading with the user problem before the solution | External deliverable |
-| NFR7 | Total AWS resource usage SHOULD stay within free-tier limits where feasible | Model choice, max tokens |
+| ID | Requirement | Enforced by | Status |
+|---|---|---|---|
+| NFR1 | Webhook endpoint MUST return HTTP 200 within 5 seconds to avoid Ring retry storms | API Gateway + Lambda timeout config | **Implemented** — a 5s `Timeout` in the `Globals` block of `template.yaml`, and the handler enqueues before responding. Never measured against Ring |
+| NFR2 | Webhook handling MUST be idempotent — duplicate `request_id` values MUST not create duplicate events | `IdempotencyTable` with 24h TTL | **Implemented** — a conditional put in `claimRequestId()`; a duplicate returns 200 and is not reprocessed |
+| NFR3 | All API keys and tokens MUST be stored as environment variables, never committed to the repository | `.env.example` + gitignore | **Implemented** — `.env.example` holds placeholder values only, and the validator's secret check scans `prd.md` and `ARCHITECTURE.md` too |
+| NFR4 | The public GitHub repository MUST include an MIT License visible in the About section | `LICENSE` at repo root | **Not implemented** — no `LICENSE` file exists, and the manifest declares `"license": "MIT"` |
+| NFR5 | The README MUST include complete setup instructions so judges can run the project locally | `README.md` | **Not implemented** — no `README.md` exists |
+| NFR6 | The demo video MUST be under 3 minutes, leading with the user problem before the solution | External deliverable | Not implemented — nothing to record yet |
+| NFR7 | Total AWS resource usage SHOULD stay within free-tier limits where feasible | Model choice, max tokens | **Partly** — `MAX_TOKENS = 80` and `TEMPERATURE = 0.2` are in place; the CloudWatch billing alarm that would *detect* a runaway does not |
 
 NFR1 and NFR2 are the two that shape the code most: they force the webhook handler to
 acknowledge fast and to be idempotent, which is why the design makes the webhook

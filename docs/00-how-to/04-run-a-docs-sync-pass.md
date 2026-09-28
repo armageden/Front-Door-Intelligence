@@ -17,13 +17,15 @@ or a spec, run a docs-sync pass and end the report with an explicit
 
 Not a judgement call. Any of these appearing in `git status`:
 
-- a file under `paths.sourceRoots` in [`docs/.docsrc.json`](../.docsrc.json) — currently **empty**
-- a file matching `paths.routeGlobs` or `paths.handlerGlobs` — currently **empty**
+- a file under `paths.sourceRoots` in [`docs/.docsrc.json`](../.docsrc.json) — currently `src`, `test`, `scripts`
+- a file matching `paths.handlerGlobs` or `paths.routeGlobs` — currently both `src/handlers/**/*.ts`
+- a file matching `paths.libGlobs` — currently `src/lib/**/*.ts`
 - `docs/.docsrc.json` itself
 - any file whose path is cited in a document under `docs/`
-- **any non-documentation file at all**, while `sourceRoots` is still empty
 
-The last clause is what applies today.
+Outside every glob, and therefore worth checking by eye: `scripts/**` (inside
+`sourceRoots` but not reverse-covered), and `template.yaml`, `package.json`, and
+`.github/workflows/docs-check.yml`.
 
 ## Steps
 
@@ -77,14 +79,16 @@ The last clause is what applies today.
    node scripts/docs-check.mjs
    ```
 
-   Check 5 does this mechanically. While the globs are empty it reports
-   **NOT APPLICABLE** — report that honestly, not as a pass.
+   Check 5 does this mechanically. It covers `libGlobs`, `routeGlobs`, and
+   `handlerGlobs`, all three of which are populated. `NOT APPLICABLE` now means a glob
+   has been emptied, not that coverage is pending.
 
 6. **Log a decision if one was made.** A real architectural choice — a new service, a
    changed key strategy, a dropped approach, a chosen library — gets one paragraph
    appended to [06-design-decisions](../02-architecture/06-design-decisions.md).
-   Existing IDs `D001`–`D007` are never edited. If it reverses an earlier decision,
-   also add a row to `ARCHITECTURE.md` §15 and bump its header version.
+   Existing IDs `D001`–`D021` are never edited; take the next unused ID rather than
+   filling a gap. If it reverses an earlier decision, also add a row to
+   `ARCHITECTURE.md` §15 and bump its header version.
 
 7. **Run the validator and fix every failure.**
 

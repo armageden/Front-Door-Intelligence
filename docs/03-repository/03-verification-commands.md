@@ -1,13 +1,13 @@
 **Back:** [00-overview](./00-overview.md)
 
-**Verified against:** `package.json` read in full; `scripts/docs-check.mjs` and `.github/workflows/docs-check.yml` both read in full; every command below executed on 2026-09-28; `git config --get core.hooksPath` confirmed unset, and the repository's git hooks directory confirmed to hold no hook file.
+**Verified against:** `package.json` read in full; `scripts/docs-check.mjs` and `.github/workflows/docs-check.yml` both read in full; every command below executed on 2026-09-28, including `npm run test:coverage`, whose `coverage/coverage-summary.json` supplied the 80.43% figure and the per-file percentages; `git config --get core.hooksPath` confirmed unset, and the repository's git hooks directory confirmed to hold no hook file.
 
 <!-- docs-check:expect-absent .githooks .husky .lintstagedrc lefthook.yml .pre-commit-config.yaml test/handlers.test.ts -->
 
 # Verification commands
 
-Six command categories are available now. Three remain unavailable, each with a stated
-reason in the contract's `commands` block.
+Seven command categories are available now. Three remain unavailable, each with a
+stated reason in the contract's `commands` block.
 
 ## Available
 
@@ -29,7 +29,7 @@ All seven were run and pass as of 2026-09-28. The docs validator has no dependen
 
 | Check | Contract key | Why |
 |---|---|---|
-| dev | `commands.dev` | No `template.yaml` and no handlers. `ARCHITECTURE.md` §9.1 plans `sam local start-api`; there is nothing to serve yet |
+| dev | `commands.dev` | The SAM CLI is not installed. `ARCHITECTURE.md` §9.1 plans `sam local start-api`, and both `template.yaml` and the handlers now exist, so the only missing piece is the tool |
 | lint | `commands.lint` | No linter installed, no config. Deliberate — typecheck is the correctness gate |
 | format | `commands.format` | No formatter, no config |
 
@@ -47,12 +47,28 @@ npm run test:coverage --silent >/dev/null 2>&1
 node -p "require('./coverage/coverage-summary.json').total.lines.pct"
 ```
 
-It read **100** on 2026-09-28 with one module under test, in well under a second.
+It read **100** when the first module was under test, in well under a second. It read
+**81.44** on 2026-09-28, across 9 test files covering all four implemented stages.
 
 This matters beyond reporting: it is the first genuinely mechanical metric this
 repository has had, and therefore the first thing an autonomous optimisation loop could
-measure. It is at its ceiling today, so it only becomes a meaningful optimisation
-target as more `src/` modules land.
+measure. It was briefly at its ceiling, which made it useless as a target; it is now
+below it again, which makes it meaningful. The two lowest-covered files are the
+newest and the least happy: `src/handlers/overlayPusher.ts` at 55.76% and
+`src/handlers/snapshotFetcher.ts` at 59.42%. Both are handler adapters whose
+uncovered lines are the default AWS-client construction and the SQS and WebSocket
+route plumbing — paths that need a real account to exercise. `src/lib/snapshotStore.ts`
+at 70.58% and `src/lib/connectionStore.ts` at 76.92% are the same story one layer down.
+`src/lib/signatureVerifier.ts` is the only file at 100%.
+
+The query stage is the counter-example: `src/handlers/eventQuery.ts` landed at 97.56%
+in one pass, because a pure response-mapping function and an injected dependency seam
+have nothing left to hide. Coverage tracks how much of a file is AWS plumbing, not how
+good the code is.
+
+**Coverage is a floor, not a verdict.** 80.43% of lines executed says nothing about
+whether the assertions match the real Ring or Bedrock APIs, because every external call
+is a fake.
 
 ## The nine checks
 
@@ -73,17 +89,19 @@ target as more `src/` modules land.
 
 Failures print a file, a line number, and a suggested fix. Exits 1 on any failure.
 
-## Reverse coverage is now partially active
+## Reverse coverage is active for code, and silent about infrastructure
 
 Check 5 became **APPLICABLE** in the tooling phase via `paths.libGlobs`
-(`src/lib/**/*.ts`), so an undocumented module under `src/lib/` now fails the
-validator. Verified by fault injection: adding an unreferenced module to `src/lib/`
-fails check 5 until a document names it.
+(`src/lib/**/*.ts`), and in the webhook-ingress and overlay-delivery phases via
+`paths.handlerGlobs` and `paths.routeGlobs` (both `src/handlers/**/*.ts`). An
+undocumented module under `src/lib/`, and an unreferenced handler or route, now fail the
+validator. Verified by fault injection when the globs were first filled in.
 
-`routeGlobs` and `handlerGlobs` are still empty, so a Lambda handler under
-`src/handlers/` can land undocumented until the next phase fills them in. That gap is
-deliberate: a glob pointing at a directory that does not exist would let the first
-handler slip through. Report it as partial coverage, not as full coverage.
+**What is still outside every glob:** `scripts/**` is inside `sourceRoots` but not
+reverse-covered, and `template.yaml`, `package.json`, and the CI workflow are in no
+glob at all. A new script, a new template resource, or a new CI step can land with no
+document naming it. Report reverse coverage as complete *for the three globs* and
+absent for infrastructure — not as a blanket claim.
 
 ## Provenance is enforced, not encouraged
 
@@ -107,8 +125,15 @@ The full statement is in `AGENTS.md` Rule 5 and `.claude/agents/docs-updater.md`
 
 | Mechanism | Status |
 |---|---|
-| GitHub Actions | **Wired up.** `.github/workflows/docs-check.yml` — job `checks` — runs `typecheck`, `test`, and `docs:check` on push to `main`, on every pull request, and on manual dispatch, across Node 22 and 24. Each step reads its command from the contract, so the workflow cannot drift from the documented commands. Blocks on failure. |
+| GitHub Actions | **Wired up, three of four gates.** `.github/workflows/docs-check.yml` — job `checks` — runs `typecheck`, `test`, and `docs:check` on push to `main`, on every pull request, and on manual dispatch, across Node 22 and 24. Each step reads its command from the contract, so the workflow cannot drift from the documented commands. Blocks on failure. |
 | Pre-commit hook | **None, deliberately.** `core.hooksPath` is unset, the repository's git hooks directory holds no hook file, and there is no `.githooks`, `.husky`, `lefthook.yml`, or `.pre-commit-config.yaml`. |
+
+**`build:verify` is not among the CI steps, and the contract previously listed it as
+one.** `scripts/verify-bundle.mjs` asserts against `dist/`, which only `npm run build`
+creates, and the workflow never builds — so adding the gate alone would fail CI on a
+missing directory. `npm run all` runs it locally, so the local gate is currently
+stronger than the CI gate. The contract's `ci.workflows[0].note` records this as a gap
+for the author rather than papering over it.
 
 The hook is skipped on purpose. The advisory drift warning is conditional on an
 existing hook system, and introducing one purely to carry a warning would change the

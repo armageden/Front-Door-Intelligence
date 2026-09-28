@@ -7,7 +7,7 @@
 | **Subject** | Product requirements |
 | **Folder** | `docs/01-product/` — declared as subject `product`, order 1, in [`docs/.docsrc.json`](../.docsrc.json) |
 | **Source of truth** | `prd.md` (repo root) |
-| **Status of the product** | Specified. No implementation exists yet — see [01-current-state](../03-repository/01-current-state.md) |
+| **Status of the product** | Specified, and **mostly built** — all seven of the eight core-pipeline requirements are implemented or partly, and three of the seven NFRs are implemented plus one partly. One handler, both front ends, and three top-level deliverables remain. See [01-requirements-index](./01-requirements-index.md) and [01-current-state](../03-repository/01-current-state.md) |
 
 **Read this when** you need to know what the product must do, who it serves, how it will
 be judged, or which requirement ID to cite in a design discussion.

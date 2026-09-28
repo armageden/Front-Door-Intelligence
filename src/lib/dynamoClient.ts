@@ -14,6 +14,7 @@ import {
   DynamoDBDocumentClient,
   GetCommand,
   PutCommand,
+  QueryCommand,
   UpdateCommand,
 } from '@aws-sdk/lib-dynamodb';
 import { ConditionalCheckFailedException } from '@aws-sdk/client-dynamodb';
@@ -195,4 +196,81 @@ export async function getEvent(
     }),
   )) as { Item?: Record<string, unknown> };
   return (response.Item as DoorEvent | undefined) ?? undefined;
+}
+
+/**
+ * `ARCHITECTURE.md` §3.5: the partition key, as `YYYY-MM-DD`.
+ *
+ * UTC, to match the partition key that ingress writes — see decision D014. A Lambda
+ * running in any region derives the same value, and it is the only date a single-partition
+ * `Query` can ask for.
+ */
+export function utcDate(now: Date = new Date()): string {
+  return now.toISOString().slice(0, 10);
+}
+
+/** The sort key ingress writes, exposed so the query path cannot drift from it. */
+export function sortKeyFor(event: { timestamp: string; event_id: string }): string {
+  return `${event.timestamp}#${event.event_id}`;
+}
+
+/**
+ * Is this a `DoorEvent`? Used to skip anything else sharing the partition.
+ *
+ * `ARCHITECTURE.md` §3.6 says the daily summary is "written to `EventsTable` as a
+ * `summary` item". When that phase lands, a summary row lands in the same partition
+ * this function reads, and would otherwise be serialised into the response as though it
+ * were a doorbell event. Guarding on the fields a real event must have keeps the query
+ * honest regardless of what else shares the partition.
+ */
+function isDoorEvent(item: unknown): item is DoorEvent {
+  if (typeof item !== 'object' || item === null) return false;
+  const candidate = item as Partial<DoorEvent>;
+  return (
+    typeof candidate.event_id === 'string' &&
+    typeof candidate.timestamp === 'string' &&
+    typeof candidate.date === 'string'
+  );
+}
+
+/**
+ * Every event in one partition, oldest first. FR8's read side.
+ *
+ * Follows `LastEvaluatedKey` to the end rather than reading one page: DynamoDB caps a
+ * single `Query` at 1 MB, and a busy day of a dozen events carries a base64 snapshot
+ * reference plus a description per row. Silently truncating would report a wrong
+ * `count`, which is worse than a slower response.
+ *
+ * Ascending is the natural order for a timeline. The sort key is
+ * `timestamp#event_id`, so ordering by it is chronological without a scan.
+ */
+export async function queryEventsByDate(
+  date: string,
+  client: DocClient = getClient(),
+): Promise<DoorEvent[]> {
+  const events: DoorEvent[] = [];
+  let exclusiveStartKey: Record<string, unknown> | undefined;
+
+  do {
+    const response = (await client.send(
+      new QueryCommand({
+        TableName: tableName(EVENTS_TABLE_ENV),
+        KeyConditionExpression: '#date = :date',
+        ExpressionAttributeNames: { '#date': 'date' },
+        ExpressionAttributeValues: { ':date': date },
+        ScanIndexForward: true,
+        ...(exclusiveStartKey ? { ExclusiveStartKey: exclusiveStartKey } : {}),
+      }),
+    )) as {
+      Items?: Record<string, unknown>[];
+      LastEvaluatedKey?: Record<string, unknown>;
+    };
+
+    for (const item of response.Items ?? []) {
+      if (isDoorEvent(item)) events.push(item);
+    }
+    exclusiveStartKey = response.LastEvaluatedKey;
+  } while (exclusiveStartKey);
+
+  return events;
 }

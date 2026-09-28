@@ -26,7 +26,7 @@ Specified in `prd.md` and `ARCHITECTURE.md`.
 
 | Field | Value |
 |---|---|
-| **Status** | **Working backend, partial.** Ingress and the describe stage are implemented and tested against fakes. No live AWS call has ever run. |
+| **Status** | **Three stages implemented, no front end.** Ingress, describe, and overlay delivery are written and tested against fakes. No live AWS call has ever run. |
 | **Language** | TypeScript `^7.0.2`, strict, ES2022, CommonJS output |
 | **Framework** | AWS serverless — Lambda, API Gateway, DynamoDB, S3, SQS, Bedrock, via SAM. Never deployed. |
 | **Package manager** | **npm** (12.1.0), lockfile `package-lock.json`. Chosen because `ARCHITECTURE.md` §9.1 specifies `npm install`, and npm resolves workspaces natively for the planned `firetv/` and `web/` packages. |
@@ -42,7 +42,7 @@ Verbatim from the contract's `commands` block. **All of the first six run and pa
 | **everything** | `npm run all` | typecheck + test + build:verify + docs:check, in order |
 | **docs:check** | `npm run docs:check` | available |
 | **typecheck** | `npm run typecheck` | available — `tsc --noEmit`, covers `test/` too |
-| **test** | `npm test` | available — vitest, 102 assertions |
+| **test** | `npm test` | available — vitest, 150 tests across 8 files |
 | **test:coverage** | `npm run test:coverage` | available — the only mechanical metric in the repo |
 | **build** | `npm run build` | available — esbuild bundles each handler into `dist/` |
 | **build:verify** | `npm run build:verify` | available — asserts `dist/` is self-contained |
@@ -63,11 +63,11 @@ subject's `order`; the validator fails otherwise.
 |---|---|---|
 | [`docs/00-how-to/`](./docs/00-how-to/00-overview.md) | Task-first recipes for this repo's recurring change types | **Doing a task? Start here.** Match your change to a recipe. |
 | [`docs/01-product/`](./docs/01-product/00-overview.md) | FR1–FR18, NFR1–NFR7, success metrics, submission checklist | You need to know what the product must do, or which requirement ID to cite |
-| [`docs/02-architecture/`](./docs/02-architecture/00-overview.md) | Pipeline design, API contracts, data store, security, decisions D001–D019 | You need the design intent or the reasoning behind a decision |
+| [`docs/02-architecture/`](./docs/02-architecture/00-overview.md) | Pipeline design, API contracts, data store, security, decisions D001–D021 | You need the design intent or the reasoning behind a decision |
 | [`docs/03-repository/`](./docs/03-repository/00-overview.md) | What exists on disk, the toolchain, check commands, the planned structure | **Before you assume any file, script, or command exists** |
-| [`docs/04-libraries/`](./docs/04-libraries/00-overview.md) | Real exported APIs of the five modules under `src/lib/` | You need a module's actual signature, return shape, or failure modes |
+| [`docs/04-libraries/`](./docs/04-libraries/00-overview.md) | Real exported APIs of the seven modules under `src/lib/` | You need a module's actual signature, return shape, or failure modes |
 | [`docs/05-hackathon-requirements/`](./docs/05-hackathon-requirements/00-overview.md) | The Devpost rules, the Ring API, and where the project docs conflict with both | You need to know what is worth points, or whether a document makes a claim the sources do not support |
-| [`docs/06-handlers/`](./docs/06-handlers/00-overview.md) | The two Lambda handlers under `src/handlers/` | You are changing a handler or tracing an event through the pipeline |
+| [`docs/06-handlers/`](./docs/06-handlers/00-overview.md) | The three implemented Lambda handlers under `src/handlers/` | You are changing a handler or tracing an event through the pipeline |
 
 Each subject folder opens with a `00-overview.md` carrying the subject name, folder
 path, a "read this when" purpose, and a table of contents. Every other file backlinks
@@ -115,13 +115,16 @@ subjects rather than proliferating them.
 
 - a file under `paths.sourceRoots` in the contract — currently `src`, `test`, `scripts`
 - a file matching `paths.handlerGlobs` — currently `src/handlers/**/*.ts`
-- a file matching `paths.routeGlobs` — currently **empty**
+- a file matching `paths.libGlobs` — currently `src/lib/**/*.ts`
+- a file matching `paths.routeGlobs` — currently `src/handlers/**/*.ts`, the same
+  glob, because every WebSocket route lives in a handler file
 - `docs/.docsrc.json` itself
 - any file whose path is cited in a document under `docs/`
 
-Note what the globs do **not** cover yet: `src/lib/**` is covered by
-`paths.libGlobs`, and a new file there fails reverse coverage. `routeGlobs` is still
-empty, so a WebSocket route or a REST resource can land undocumented.
+Note what the globs do **not** cover: `scripts/**` is inside `sourceRoots` but is not
+reverse-covered, so a new script under it can land undocumented. `template.yaml`,
+`package.json`, and `.github/workflows/docs-check.yml` are cited by path in documents
+but are not in any glob, so a change to them is caught only by this list.
 
 Then run the pass:
 
@@ -173,8 +176,15 @@ The gates prove **structure, not truth**, and each has a specific blind spot:
 simulator and no AWS account. Every request shape in `src/lib/ringClient.ts` is verified
 against documentation, not observed traffic. Say so in your report.
 
-While `routeGlobs` is empty, reverse coverage is **partial**, not complete. Report it
-that way.
+`npm run all` locally runs four gates; CI runs only three. `build:verify` is absent
+from CI because it asserts against `dist/`, which only `npm run build` creates, and the
+workflow has no build step. That is a recorded gap, not a design — see the contract's
+`ci.workflows[0].note`. Until it is closed, the local gate is stronger than CI.
+
+Reverse coverage is **complete for the three globs** — `src/lib/**`,
+`src/handlers/**`, and routes. It is not complete for the repository: `scripts/**`,
+`template.yaml`, and the CI workflow are outside every glob. Report coverage as
+per-glob, not as a blanket claim.
 
 ### Rule 6 — Report honestly
 
@@ -225,14 +235,20 @@ exactly one home: `.claude/agents/docs-updater.md`.
 
 ## Enforcement
 
-`.github/workflows/docs-check.yml` runs the four available gates — typecheck, test,
-build:verify, docs:check — on push to `main`, on every pull request, and on manual
-dispatch, across the Node versions in its matrix. Each step reads its command from the
-contract, so the workflow cannot drift from the documented commands. It blocks on
-failure — that is the gate.
+`.github/workflows/docs-check.yml` runs three of the four available gates — typecheck,
+test, docs:check — on push to `main`, on every pull request, and on manual dispatch,
+across the Node versions in its matrix. Each step reads its command from the contract,
+so the workflow cannot drift from the documented commands. It blocks on failure — that
+is the gate.
 
-`build:verify` is in CI because a bundle that cannot require its own dependencies would
-otherwise pass CI and fail in production.
+**`build:verify` is not in CI, and this file previously claimed it was.** The contract
+recorded it in `ci.workflows[0].runsSteps`; the workflow did not run it. The reason is
+ordering: `scripts/verify-bundle.mjs` asserts against `dist/`, which only
+`npm run build` creates, and the workflow has no build step. Closing that means adding
+`npm run build` before the gate — a real change to a real file, and the author's call,
+not a documentation edit. The reason for wanting the gate still stands: a bundle that
+cannot require its own dependencies would otherwise pass CI and fail in production.
+`npm run all` catches it locally today.
 
 There is deliberately no pre-commit hook. When a hook system appears, prepend an
 **advisory** drift warning that never blocks and never alters existing hook output. CI

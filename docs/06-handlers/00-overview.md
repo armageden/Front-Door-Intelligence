@@ -1,6 +1,6 @@
 **Verified against:** `docs/.docsrc.json`, the contract this subject is declared in, and the working tree.
 
-<!-- docs-check:expect-absent src/handlers/bedrockDescriber.ts src/handlers/overlayPusher.ts src/handlers/eventQuery.ts src/handlers/dailySummary.ts  src/handlers/overlayPusher.ts src/handlers/eventQuery.ts src/handlers/dailySummary.ts -->
+<!-- docs-check:expect-absent src/handlers/bedrockDescriber.ts src/handlers/dailySummary.ts -->
 
 # 06 — Handlers
 
@@ -9,8 +9,8 @@
 | **Subject** | Lambda request handlers under `src/handlers/` |
 | **Folder** | `docs/06-handlers/` — declared as subject `handlers`, order 6, in [`docs/.docsrc.json`](../.docsrc.json) |
 | **Source of truth** | `src/handlers/` |
-| **Reverse coverage** | Active — `paths.handlerGlobs` is `src/handlers/**/*.ts` |
-| **Status** | Two of six handlers implemented. `src/handlers/overlayPusher.ts`, `src/handlers/eventQuery.ts`, and `src/handlers/dailySummary.ts` remain. |
+| **Reverse coverage** | Active — `paths.handlerGlobs` and `paths.routeGlobs` are both `src/handlers/**/*.ts`, so an unreferenced handler or route fails the validator |
+| **Status** | Four of six handlers implemented. Only `src/handlers/dailySummary.ts` remains; `src/handlers/bedrockDescriber.ts` was folded into `snapshotFetcher.ts` by decision D018 |
 
 **Read this when** you need what a handler actually receives, what status it returns,
 and why those status codes were chosen — as opposed to the design intent in
@@ -22,6 +22,8 @@ and why those status codes were chosen — as opposed to the design intent in
 |---|---|
 | [01-webhook-ingress](./01-webhook-ingress.md) | `webhookHandler.ts` → `ingest()`, `readRawBody()`, `handler()`; the raw-body ordering rule, the status-code policy, and the queue hand-off |
 | [02-describe-stage](./02-describe-stage.md) | `snapshotFetcher.ts` → `describeEvent()`, `handler`; the media window, and why every failure still writes a sentence |
+| [03-overlay-push](./03-overlay-push.md) | `overlayPusher.ts` → `deliverEvent()`, `onConnect`, `onDisconnect`; the §3.4 payload, and why the picture-in-picture is not implemented |
+| [04-event-query](./04-event-query.md) | `eventQuery.ts` → `queryToday()`, `buildTodayResponse()`; the auth the spec omitted, and why "today" is UTC and overridable |
 
 ## Naming
 
@@ -33,6 +35,6 @@ relative links in three sibling folders.
 ## Related
 
 - The shared modules the handler calls: [04-libraries](../04-libraries/00-overview.md)
-- The design behind this stage: [02-pipeline-components](../02-architecture/02-pipeline-components.md)
+- The design behind each stage: [02-pipeline-components](../02-architecture/02-pipeline-components.md)
 - The corrected Ring payload shape: [04-ring-api-findings](../05-hackathon-requirements/04-ring-api-findings.md)
-- Shared modules: [04-libraries](../04-libraries/00-overview.md)
+- What is still unwritten: [04-planned-structure](../03-repository/04-planned-structure.md)

@@ -1,6 +1,6 @@
 **Back:** [00-overview](./00-overview.md)
 
-**Verified against:** `ARCHITECTURE.md` §15, read directly. D001–D007 are paraphrases of that table's seven rows; D008–D012 were made during the tooling phase and are not in that table. The ADR-lite format is this repository's own and is not a project artefact.
+**Verified against:** `ARCHITECTURE.md` §15, read directly. D001–D007 are paraphrases of that table's seven rows; D008–D013 were made during the tooling and webhook-ingress phases and are not in that table. D014–D021 were added by the describe and overlay-delivery phases, and are likewise absent from the spec's table. The ADR-lite format is this repository's own and is not a project artefact. Take the next unused ID; gaps are never filled.
 
 <!-- docs-check:expect-absent test/handlers.test.ts tsconfig.build.json -->
 
@@ -348,6 +348,101 @@ rather than being flattened.
 The one exception is 425, which leaves `processed: false` so the queue redelivers: that
 failure is early rather than terminal, and marking it processed would discard a
 recoverable event.
+
+### D020 — A connections table, which `ARCHITECTURE.md` §11 does not list
+
+**Date:** 2026-09-28. **Source:** overlay-delivery phase.
+
+A DynamoDB table of live WebSocket connection ids was added. §11's planned tree does not
+contain it, so this is a gap in the plan being filled rather than a departure from it.
+
+It is not an optimisation. API Gateway owns the socket and delivers the connection id to
+`$connect` **once, and nowhere else**; `PostToConnection` needs that id to push anything
+at all. A module-level array cannot substitute: Lambda invocations are stateless, so two
+concurrent instances would each hold half the connections and neither would know about
+the other's, and every event would reach roughly half the screens, intermittently.
+
+Rows carry a 24-hour TTL, but the TTL is only a growth bound. The real mechanism is
+`GoneException` on the next push, which prunes the row on the spot — so the table
+converges on reality without a sweeper job, and the TTL only needs to outlive a Fire TV
+that is merely asleep.
+
+### D021 — The picture-in-picture is not implemented, and the reason is a platform limit
+
+**Date:** 2026-09-28. **Source:** overlay-delivery phase.
+
+`ARCHITECTURE.md` §3.4 specifies a PiP overlay that appears over whatever the user is
+watching without interrupting playback. **This is not implementable as specified on Vega
+OS**, verified against the documentation on 2026-09-28:
+
+- No system-level overlay, picture-in-picture, or heads-up API exists in any of the 38
+  documented Vega APIs. Overlaying *another app's* video has no documented path.
+- Overlaying **your own** video works, but only through a transparent
+  `@amazon-devices/webview` sibling of `KeplerVideoSurfaceView`. React Native `zIndex`
+  and `elevation` do not reach the hardware video layer, so a plain absolutely-positioned
+  view silently renders underneath — the failure a community thread documents someone
+  already hitting.
+- `useToastKepler`, the closest system surface, is text-and-icon with a fixed SHORT or
+  LONG duration, so it cannot express FR14's 15-second auto-dismiss.
+- Focus selection **ignores z-order**, so FR13's dismiss button would not be reachable by
+  D-pad navigation over a content grid.
+
+What was built instead is the delivery half: the §3.4 payload, per-connection fan-out,
+and the connection registry. All of that is specified, implementable, and
+track-independent. The rendering decision is deferred to the author because it depends
+on the track choice — Fire OS Android has documented heads-up notifications that float
+over content, which Vega does not, and the rules permit either OS.
+
+**FR6 is at risk regardless.** The path is now three queue hops, and the Bedrock call
+alone is several seconds, against an 8-second budget. Unmeasured.
+
+### D022 — A static `X-Query-Key` guards `GET /events/today`, because the spec names no auth
+
+**Date:** 2026-09-28. **Source:** query phase.
+
+`POST /webhook/ring` is authenticated by an HMAC over the body — Ring holds the secret,
+so the project never issues or checks a caller identity, and FR2 covers it. `GET
+/events/today` has no such partner, and **`ARCHITECTURE.md` §4.2 and §5.2 specify the
+endpoint without naming any auth mechanism.** §6's mitigation table does not mention it
+either. A literal reading of the spec is a public endpoint returning a homeowner's door
+activity to anyone who guesses the URL.
+
+The endpoint requires `X-Query-Key`, compared in constant time via `timingSafeEqual`
+against `QUERY_API_KEY`. **It fails closed**: a missing environment variable throws and
+becomes a 500, rather than the endpoint deciding that everyone is allowed. Two tests
+assert both halves.
+
+This is the minimum that makes the endpoint safe to ship, and it is recorded here as a
+design choice the spec did not make rather than something derived from it. It is not
+adequate for a real multi-user product — a static key does not distinguish one homeowner
+from another, and one table holds one homeowner's data. A real authorizer (IAM, or
+Cognito on the HTTP API) plus per-account partitioning are the correct answers and are
+left as follow-ups. The IAM policy is already narrowed to match: `dynamodb:Query` and
+`s3:GetObject` only, with no write action on the table.
+
+### D023 — "Today" is the UTC partition, overridable by `?date=`, and a bad date is a 400
+
+**Date:** 2026-09-28. **Source:** query phase.
+
+FR8 asks for "all events for the current day". The partition key is **UTC** (D014), and
+that is the only partition a `Query` addresses cheaply — so the endpoint defaults to the
+UTC date and accepts `?date=YYYY-MM-DD` for anything else. A client that wants a
+homeowner's local day asks for the partition it wants.
+
+Rejected: silently serving the UTC day and calling it "today". For part of every day that
+is a plausible-looking wrong answer, and the client cannot tell. Rejected also:
+computing local time in the handler, which is the execution-environment coupling D014
+already rejected once.
+
+A malformed `?date=` returns **400 `invalid_date`**. Falling back to today would hide the
+caller's own bug behind a well-formed response, and a wrong date that quietly returns the
+right-looking answer is among the hardest bugs to find. `2026-02-31` is rejected too —
+well-formed but not a real date, so it can never hold a partition.
+
+The response also splits §5.2's `event_type: "motion.human"` into the two real fields,
+`event_type: "motion_detected"` and `sub_type: "human"`, which is the same correction
+FR3 required of the ingress path, and adds `processed`, a nullable `description`, and
+`truncated` so a capped response never reports a quietly wrong `count`.
 
 ### Related
 

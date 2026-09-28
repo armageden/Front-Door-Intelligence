@@ -1,11 +1,13 @@
 **Back:** [00-overview](./00-overview.md)
 
-**Verified against:** `ARCHITECTURE.md` §3.5, read directly, including the event item JSON. The pre-signed URL rule was checked against §6. No table definition exists in the repository.
+**Verified against:** `ARCHITECTURE.md` §3.5, read directly, including the event item JSON. The pre-signed URL rule was checked against §6. The status note below was reconciled against the working tree on 2026-09-28: `template.yaml` declares `EventsTable`, `IdempotencyTable`, and `ConnectionsTable`, and the client code is in `src/lib/dynamoClient.ts` and `src/lib/connectionStore.ts`, both documented in [04-libraries](../04-libraries/00-overview.md). An earlier version of this page claimed no table definition and no client code existed; that was true when written and stopped being true at the tooling phase.
 
 # Data store
 
-Source: `ARCHITECTURE.md` §3.5. **Specified, not implemented** — no table definition,
-CDK or SAM resource, or client code exists in the repository.
+Source: `ARCHITECTURE.md` §3.5. **The tables below are implemented in `template.yaml` and
+their client code is in `src/lib/`** — the shapes and the reason for each key are still
+specified here. Two of the two specified tables exist, plus a third the spec does not
+list.
 
 ## Tables
 

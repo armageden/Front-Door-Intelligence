@@ -39,6 +39,14 @@ Parameters:
     Description: Ring Partner API Client Secret (ARCHITECTURE.md §3.1).
   RingRefreshToken:
     Type: String
+  QueryApiKey:
+    Type: String
+    NoEcho: true
+    Description: >-
+      Shared key guarding GET /events/today, sent as the X-Query-Key header. ARCHITECTURE.md
+      §5.2 specifies the endpoint but names no auth mechanism; §6's mitigation table omits
+      it. Recorded as decision D022. Replace with a real authorizer before any multi-user
+      deployment — a static key does not distinguish one homeowner from another.
     NoEcho: true
     Description: >-
       Ring OAuth refresh token, ~30 day lifetime (ARCHITECTURE.md §3.2). Must be
@@ -53,6 +61,9 @@ Parameters:
   SnapshotBucketName:
     Type: String
     Default: front-door-snapshots
+  ConnectionsTableName:
+    Type: String
+    Default: FrontDoorConnections
   EventsTableName:
     Type: String
     Default: FrontDoorEvents
@@ -229,6 +240,135 @@ Resources:
       QueueName: !Sub '${AWS::StackName}-describe-dlq'
       MessageRetentionPeriod: 1209600
 
+  # --- Overlay delivery (ARCHITECTURE.md §3.4) -----------------------------------
+
+  # Connection registry. API Gateway owns the socket and delivers the connection id to
+  # $connect exactly once, so this table is the only way to push later. Not in the
+  # ARCHITECTURE.md §11 planned tree - recorded as decision D020.
+  ConnectionsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Ref ConnectionsTableName
+      AttributeDefinitions:
+        - AttributeName: connection_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: connection_id
+          KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+      # A client that vanishes without a clean $disconnect must not persist forever.
+      # The real signal is GoneException on the next push; this just bounds growth.
+      TimeToLiveSpecification:
+        AttributeName: expires_at
+        Enabled: true
+
+  OverlayFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-overlay'
+      CodeUri: dist/
+      Handler: handlers/overlayPusher.handler
+      Description: >-
+        Pushes the finished description to connected Fire TV clients over a WebSocket.
+        Prunes connections API Gateway has forgotten.
+      Timeout: 30
+      MemorySize: 256
+      Environment:
+        Variables:
+          DYNAMODB_EVENTS_TABLE: !Ref EventsTable
+          CONNECTIONS_TABLE: !Ref ConnectionsTable
+          S3_SNAPSHOT_BUCKET: !Ref SnapshotBucket
+          WEBSOCKET_ENDPOINT: !Sub 'https://${OverlayWebSocketApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}/prod'
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref EventsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ConnectionsTable
+        # Read-only on the snapshot bucket: the stage signs URLs, it does not upload.
+        - S3ReadPolicy:
+            BucketName: !Ref SnapshotBucket
+        - Statement:
+            - Effect: Allow
+              Action: [execute-api:ManageConnections]
+              Resource:
+                - !Sub 'arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${OverlayWebSocketApi}/*'
+      Events:
+        OverlayQueue:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt OverlayQueue.QueueArn
+            BatchSize: 1
+            FunctionResponseTypes: [ReportBatchItemFailures]
+
+  OverlayQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub '${AWS::StackName}-overlay'
+      MessageRetentionPeriod: 345600
+      VisibilityTimeout: 90
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt OverlayQueueDlq.Arn
+        maxReceiveCount: 5
+
+  OverlayQueueDlq:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub '${AWS::StackName}-overlay-dlq'
+      MessageRetentionPeriod: 1209600
+
+  # The WebSocket API D001 chose over SNS. $connect and $disconnect are load-bearing:
+  # the connection id is delivered to them and nowhere else, so without these routes
+  # nothing can ever be pushed and every description is silently dropped.
+  OverlayWebSocketApi:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: !Sub '${AWS::StackName}-overlay-ws'
+      ProtocolType: WEBSOCKET
+      RouteSelectionExpression: '$request.body.action'
+
+  OverlayConnectFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: dist/
+      Handler: handlers/overlayPusher.onConnect
+      Description: >-
+        Registers a WebSocket connection id. Separate from the pusher so a socket is
+        not held open by a pusher invocation.
+      Timeout: 5
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ConnectionsTable
+      Events:
+        Connect:
+          Type: ApiGatewayWebSocket
+          Properties:
+            Route: $connect
+            RestApiId: !Ref OverlayWebSocketApi
+
+  OverlayDisconnectFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: dist/
+      Handler: handlers/overlayPusher.onDisconnect
+      Description: Removes a WebSocket connection id.
+      Timeout: 5
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ConnectionsTable
+      Events:
+        Disconnect:
+          Type: ApiGatewayWebSocket
+          Properties:
+            Route: $disconnect
+            RestApiId: !Ref OverlayWebSocketApi
+
+  OverlayWebSocketStage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      ApiId: !Ref OverlayWebSocketApi
+      StageName: prod
+      AutoDeploy: true
+
   # --- Snapshot storage (ARCHITECTURE.md §3.5, §6) -------------------------------
 
   SnapshotBucket:
@@ -267,6 +407,43 @@ Resources:
               Bool:
                 'aws:SecureTransport': false
 
+  # --- Query stage (ARCHITECTURE.md §4.2) ---------------------------------------
+
+  EventQueryFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-events-query'
+      CodeUri: dist/
+      Handler: handlers/eventQuery.handler
+      Description: >-
+        GET /events/today. Queries the events table by its UTC date partition and returns
+        the §5.2 response with a pre-signed snapshot URL per event.
+      Environment:
+        Variables:
+          QUERY_API_KEY: !Ref QueryApiKey
+          DYNAMODB_EVENTS_TABLE: !Ref EventsTable
+          S3_SNAPSHOT_BUCKET: !Ref SnapshotBucket
+      Policies:
+        # Read-only. This stage is a query; it must not be able to write or delete an
+        # event, so the events table gets dynamodb:Query and nothing else.
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:Query
+              Resource: !GetAtt EventsTable.Arn
+        # s3:GetObject only, for signing. No ListBucket, no PutObject.
+        - Statement:
+            - Effect: Allow
+              Action:
+                - s3:GetObject
+              Resource: !Sub '${SnapshotBucket.Arn}/*'
+      Events:
+        HttpApi:
+          Type: Api
+          Properties:
+            Path: /events/today
+            Method: GET
+
   # --- API Gateway (ARCHITECTURE.md §3.1) ---------------------------------------
 
   HttpApi:
@@ -288,6 +465,12 @@ Resources:
       LogGroupName: !Sub '/aws/lambda/${DescribeFunction}'
       RetentionInDays: !Ref LogRetentionDays
 
+  OverlayLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${OverlayFunction}'
+      RetentionInDays: !Ref LogRetentionDays
+
 Outputs:
   DescribeDeadLetterQueueUrl:
     Description: >-
@@ -300,6 +483,18 @@ Outputs:
       verified against the raw body; do not enable request/response mapping that
       would re-serialise the payload before it reaches the function.
     Value: !Sub 'https://${HttpApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}/webhook/ring'
+  OverlayWebSocketUrl:
+    Description: The Fire TV app connects here. Registered ids are what the pusher posts to.
+    Value: !Sub 'wss://${OverlayWebSocketApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}/prod'
+  OverlayDeadLetterQueueUrl:
+    Description: Messages that failed five times. The event is still in the table; only the push was lost.
+    Value: !Ref OverlayQueueDlq
+  EventsQueryEndpoint:
+    Description: >-
+      GET /events/today — FR8. Requires the X-Query-Key header, whose value is the
+      QueryApiKey parameter. Accepts an optional ?date=YYYY-MM-DD (UTC partition);
+      defaults to today in UTC. Never deployed or validated: no AWS account, no SAM CLI.
+    Value: !Sub 'https://${HttpApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}/events/today'
   EventsTableName:
     Value: !Ref EventsTable
   IdempotencyTableName:

@@ -22,8 +22,8 @@ wins and this page is the bug.
 | File | What it covers |
 |---|---|
 | [01-current-state](./01-current-state.md) | Complete inventory of the working tree and what is missing against the spec |
-| [02-toolchain](./02-toolchain.md) | Verified runtimes, the absent package manifest, and why no package manager can be named |
-| [03-verification-commands](./03-verification-commands.md) | The one real check command, the nine validator checks, and CI/hook status |
+| [02-toolchain](./02-toolchain.md) | Verified runtimes, the npm toolchain, and the bundler-versus-`tsc` decision |
+| [03-verification-commands](./03-verification-commands.md) | The seven runnable commands, the coverage metric, the nine validator checks, and CI/hook status |
 | [04-planned-structure](./04-planned-structure.md) | The file tree from `ARCHITECTURE.md` §11, recorded as planned and unverified |
 
 ## Relationship to other subjects

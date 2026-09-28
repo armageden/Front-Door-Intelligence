@@ -22,7 +22,19 @@
 
 **Verified against:** `ARCHITECTURE.md` §5.1, §5.2, §9.2 and §3.5, read directly. Cross-checked against the official Ring API documentation — see the warning above. The contract below is the specification as written, not the real API.
 
-Source: `ARCHITECTURE.md` §5. Both endpoints are **specified, not implemented**.
+Source: `ARCHITECTURE.md` §5. **Both endpoints are implemented** — `POST /webhook/ring`
+by `src/handlers/webhookHandler.ts` and `GET /events/today` by
+`src/handlers/eventQuery.ts`.
+
+This page records the specification as written — see the warning above for which parts
+of it the Ring API does not support. Two gaps between §5.2 and the implementation are
+recorded as decisions rather than silently resolved:
+
+- **§5.2 names no auth mechanism** for `GET /events/today`, and §6's mitigation table
+  omits it. A static `X-Query-Key` was added — decision D022.
+- **§5.2 shows `"event_type": "motion.human"`**, which is wrong twice: `motion_detected`
+  is what the webhook sends for `type`, and `human` is the flat `sub_type`. The
+  implementation returns both fields under their real names — decision D023.
 
 Two endpoints are defined. Anything else referenced elsewhere in the design — the
 optional MCP endpoint at `/mcp`, for example — is mentioned in passing by

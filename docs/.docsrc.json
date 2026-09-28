@@ -17,7 +17,8 @@
     "branch": "main",
     "shape": "single-package",
     "workspaces": [],
-    "commitCount": 1
+    "commitCount": 3,
+    "commitCountNote": "Three commits, all authored before any code existed: the PRD, a docs pass, and the webhook-pipeline implementation. The overlay-delivery phase is uncommitted — see repo shape in 03-repository/01-current-state.md. Git is read-only to agents; the human owns every commit."
   },
   "packageManager": {
     "detected": true,
@@ -71,7 +72,9 @@
     }
   },
   "buildTools": {
-    "detected": false,
+    "detected": true,
+    "name": "AWS SAM",
+    "template": "template.yaml",
     "checked": [
       "Makefile",
       "justfile",
@@ -81,7 +84,11 @@
       "CMakeLists.txt",
       "samconfig.toml"
     ],
-    "note": "ARCHITECTURE.md §8.3 plans `sam build && sam deploy --guided`. No template.yaml or samconfig.toml exists, so there is nothing to build."
+    "note": "ARCHITECTURE.md §8.3 plans `sam build && sam deploy --guided`. template.yaml now exists and declares six AWS::Serverless::Function resources across four source files — webhookHandler.handler, snapshotFetcher.handler, overlayPusher.handler, overlayPusher.onConnect, overlayPusher.onDisconnect, and eventQuery.handler. None of the task-runner files above exists, and no samconfig.toml does. The SAM CLI itself is still unavailable — see commands.dev — so the template has never been built or deployed.",
+    "changedFrom": {
+      "previous": "detected: false — no template.yaml and no task runner",
+      "reason": "The webhook-ingress and overlay-delivery phases created template.yaml. The contract is updated to match reality rather than the plan being worked around."
+    }
   },
   "commands": {
     "docsCheck": {
@@ -97,7 +104,7 @@
     "dev": {
       "status": "unavailable",
       "run": null,
-      "reason": "No template.yaml and no handlers. ARCHITECTURE.md §9.1 plans `sam local start-api`; there is nothing to serve. Becomes available when the first Lambda handler exists."
+      "reason": "ARCHITECTURE.md §9.1 plans `sam local start-api`, and both template.yaml and the handlers now exist, so the missing piece is the SAM CLI itself rather than the code it would serve. Installing the SAM CLI would make this available; the contract has not been changed to assume that."
     },
     "build": {
       "status": "available",
@@ -128,7 +135,7 @@
         "test:coverage"
       ],
       "metric": "require('./coverage/coverage-summary.json').total.lines.pct",
-      "metricNote": "The first real single-number metric this repository has had, and therefore the first thing an optimisation loop could measure. It read 84.47% line coverage on 2026-09-28 across 7 test files. The uncovered remainder is deliberate: snapshotStore's default S3Client and SQSClient construction, and snapshotFetcher's SQS handler adapter, both of which need an AWS account to exercise. Anything below the ceiling would now be a genuine signal rather than an artifact of having almost no code."
+      "metricNote": "The first real single-number metric this repository has had, and therefore the first thing an optimisation loop could measure. It read 80.43% line coverage on 2026-09-28 across 8 test files. The uncovered remainder is dominated by default AWS-client construction in snapshotStore and connectionStore, which needs an AWS account to exercise, plus the SQS handler adapters. Those are recorded per module rather than left as a vague gap."
     },
     "typecheck": {
       "status": "available",
@@ -181,12 +188,14 @@
       "scripts"
     ],
     "sourceRootsNote": "Populated by the tooling phase. src/ is the product code, test/ holds the vitest suites, scripts/ holds the documentation validator. Rule 3 in AGENTS.md keys off this list.",
-    "routeGlobs": [],
-    "routeGlobsNote": "Still empty: no HTTP route exists. The first entry point arrives with src/handlers/webhookHandler.ts, which is when the WebSocket route and GET /events/today follow. Report reverse coverage against the globs below until then.",
+    "routeGlobs": [
+      "src/handlers/**/*.ts"
+    ],
+    "routeGlobsNote": "Populated by the overlay-delivery phase. overlayPusher.ts exports the WebSocket $connect and $disconnect routes alongside the SQS consumer, so route globs now cover route handlers as well as consumers. Both were previously empty, and an empty glob would have let a route land undocumented. The glob is identical to handlerGlobs because every route lives in a handler file; they are kept as two keys because they answer different questions and a future route may live elsewhere.",
     "handlerGlobs": [
       "src/handlers/**/*.ts"
     ],
-    "handlerGlobsNote": "Active as of the webhook-ingress phase. src/handlers/ now exists, so a handler that no document references fails the validator. A handler can no longer land undocumented. routeGlobs is still empty: no WebSocket route or REST resource beyond the webhook exists yet.",
+    "handlerGlobsNote": "Active as of the webhook-ingress phase. src/handlers/ now exists, so a handler that no document references fails the validator. A handler can no longer land undocumented.",
     "libGlobs": [
       "src/lib/**/*.ts"
     ],
@@ -202,7 +211,7 @@
       "**/__fixtures__/**",
       "**/migrations/**"
     ],
-    "excludeGlobsNote": "Inert until code lands. Fixtures and generated output are excluded from reverse coverage because they are inputs, not surface. Migrations are excluded by default; flip this if the project later wants migrations documented individually."
+    "excludeGlobsNote": "Active. Fixtures and generated output are excluded from reverse coverage because they are inputs, not surface. *.test.* and *.spec.* are excluded so a test file does not count as documentation of the module it exercises. Migrations are excluded by default; flip this if the project later wants migrations documented individually."
   },
   "pathVerification": {
     "$comment": "Drives check 1. Decides which backticked tokens in docs are assertions about real files.",
@@ -470,10 +479,9 @@
         "runsSteps": [
           "typecheck",
           "test",
-          "buildVerify",
           "docsCheck"
         ],
-        "note": "One job runs every available gate: typecheck, test, build:verify, and docs:check. build:verify runs because a bundle that cannot require its own dependencies would otherwise pass CI and fail in production. Steps read their commands from this contract."
+        "note": "One job runs three of the four available gates: typecheck, test, and docs:check. build:verify is deliberately NOT in CI yet, and that is a gap rather than a design. It is order-dependent — scripts/verify-bundle.mjs asserts against dist/, which only exists after commands.build runs, and the workflow has no build step, so adding the gate alone would make CI fail on a missing directory. Adding it means adding `npm run build` first. Recorded here as a finding for the author, not silently papered over. Note also that `npm run all` locally does run build:verify, so the local gate is stronger than the CI gate."
       }
     ]
   },
@@ -494,10 +502,14 @@
   "limitations": [
     "This contract records discovered reality as of 2026-09-28. It is a description, not an enforcement of the build.",
     "docs-check proves document structure, not truth. It cannot confirm that a documented auth requirement, status code, parameter, or behaviour actually matches the handler, because it does not read semantics. A passing docs:check is never evidence that the docs are correct.",
-    "Reverse coverage is ACTIVE for src/lib and src/handlers. routeGlobs is still empty, so the WebSocket overlay channel and GET /events/today can land undocumented. That gap is named here rather than papered over.",
-    "template.yaml has never been deployed or validated. No AWS account and no SAM CLI are available, so it is checked only for YAML well-formedness and for consistency with the build output. The Handler path is asserted to match a real file in dist/.",
-    "The pipeline terminates at storage. The snapshot fetch and Bedrock description (FR4-FR6) are not wired, so no event yet produces a description or an overlay. The stored processed:false flag marks where the chain stops.",
-    "Nothing in src/lib/ringClient.ts has been exercised against live Ring infrastructure. Ring publishes no webhook or media simulator; the Developer Playground issues tokens and simulates live view only. Every request shape in that module is verified against documentation, not against observed traffic.",
-    "The trigger for EncryptedMediaError is an inference, not a documented fact: Ring states TAKE/E2EE media comes back encrypted but publishes no status code or content type for it. Recorded as decision D016."
+    "Reverse coverage is ACTIVE for src/lib, src/handlers, and route handlers. A new file in any of them that no document names fails the validator. This proved its worth in the query phase: creating src/handlers/eventQuery.ts failed check 1 in five documents at once, because five separate expect-absent declarations had listed it. That is the mechanism working, not a nuisance.",
+    "GET /events/today required an auth mechanism that ARCHITECTURE.md does not specify. A static X-Query-Key was added, fails closed when unset, and is recorded as decision D022. There is still no per-account separation: one table, one key, one homeowner. Not deployable for a real multi-user product.",
+    "The events table is partitioned by a UTC date (D014) and GET /events/today defaults to that partition, overridable with ?date=. A homeowner's local day is not computed anywhere. The dashboard that would need it does not exist.",
+    "template.yaml has never been deployed or validated. No AWS account and no SAM CLI are available, so it is checked only for YAML well-formedness and for consistency with the build output. Every Handler path is asserted to match a real file in dist/, and that is as far as verification goes.",
+    "Nothing in src/lib/ringClient.ts or src/lib/bedrockClient.ts has been exercised against live AWS or Ring. There is no webhook or media simulator; the Developer Playground issues tokens and simulates live view only. Every request shape is verified against documentation, not observed traffic.",
+    "The Bedrock request envelope is the least-verified thing in the repository: no AWS documentation was fetched while writing it. It fails loudly, as an API error caught into the FR11 fallback, rather than silently.",
+    "The trigger for EncryptedMediaError is an inference, not a documented fact: Ring states TAKE/E2EE media comes back encrypted but publishes no status code or content type for it. Recorded as decision D016.",
+    "The picture-in-picture overlay specified in ARCHITECTURE.md 3.4 is NOT implemented, because no documented Vega OS API supports it. The delivery half is implemented. Recorded as decision D021.",
+    "FR6's 8-second end-to-end target is unmeasured and at risk: the path is three queue hops and the Bedrock call alone is several seconds. FR4's 5-second snapshot target is likewise unmeasured."
   ]
 }

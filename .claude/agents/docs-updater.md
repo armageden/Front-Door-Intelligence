@@ -41,11 +41,16 @@ After **any** task that touched code, config, infrastructure, or a spec.
 
 **"Touched code" is concrete, not a judgement call.** Any of these in `git status`:
 
-- a file under `paths.sourceRoots` — currently **empty**
-- a file matching `paths.routeGlobs` or `paths.handlerGlobs` — currently **empty**
+- a file under `paths.sourceRoots` — currently `src`, `test`, `scripts`
+- a file matching `paths.handlerGlobs` or `paths.routeGlobs` — currently both
+  `src/handlers/**/*.ts`
+- a file matching `paths.libGlobs` — currently `src/lib/**/*.ts`
 - `docs/.docsrc.json` itself
 - any file whose path is cited in a document under `docs/`
-- any non-documentation file at all, while `sourceRoots` is empty
+
+Not covered by any glob, and therefore worth checking by eye: `scripts/**` is inside
+`sourceRoots` but is not reverse-covered, and `template.yaml`, `package.json`, and
+`.github/workflows/docs-check.yml` are in no glob at all.
 
 Not needed for: reading code, answering questions, or changes confined to files no
 document references.
@@ -59,7 +64,7 @@ document references.
 - **Never present a plan as a fact.** Unwritten paths get an angle-bracket placeholder,
   an `expect-absent` declaration, or a planned-skip region.
 - **Never renumber** a requirement ID (`FR1`–`FR18`), an NFR (`NFR1`–`NFR7`), a
-  decision ID (`D001`–`D007`), or a subject folder number.
+  decision ID (`D001`–`D021`), or a subject folder number.
 - **Never edit the contract to make a check pass.** If the contract is wrong, that is a
   finding to report, not a thing to paper over.
 - **Never delete a document to make a check pass.** Fix the reference.
@@ -151,8 +156,10 @@ the reason on every run. Keep that list empty unless it is really warranted.
 node scripts/docs-check.mjs
 ```
 
-Its check 5 does this mechanically. While the globs are empty it reports
-`NOT APPLICABLE` — report that honestly, not as a pass.
+Its check 5 does this mechanically. It now covers `libGlobs`, `routeGlobs`, and
+`handlerGlobs`, and reports the count of files it found. It reports `NOT APPLICABLE`
+only if a glob is empty — say so honestly if you see it, but note that all three globs
+are currently populated, so `NOT APPLICABLE` now means something has been undone.
 
 ## Step 5 — Log a significant decision
 
@@ -162,7 +169,7 @@ a dropped approach, a chosen library, a new pipeline stage.
 
 Record **what was decided**, **why**, the **date**, and the **source** (the task, or the
 section of `ARCHITECTURE.md` or `prd.md` where it was already recorded). Existing
-entries `D001`–`D007` are never edited.
+entries `D001`–`D021` are never edited. Take the next unused ID; never fill a gap.
 
 If it reverses an earlier decision, also add a row to `ARCHITECTURE.md` §15 following
 the existing `Issue in v1 | Correction in v2` shape, and bump the version in the

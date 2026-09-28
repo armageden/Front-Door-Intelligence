@@ -1,12 +1,26 @@
 **Back:** [00-overview](./00-overview.md)
 
-**Verified against:** `ARCHITECTURE.md` §3.1–§3.4, §3.6 and §3.7, read directly. Section numbers are the source's own, not renumbered. Both prompts are quoted verbatim from §3.3 and §3.6. §3.5 is in `04-data-store.md` because it is a data contract, not a handler.
+**Verified against:** `ARCHITECTURE.md` §3.1–§3.4, §3.6 and §3.7, read directly. Section numbers are the source's own, not renumbered. Both prompts are quoted verbatim from §3.3 and §3.6. §3.5 is in `04-data-store.md` because it is a data contract, not a handler. The status table above was reconciled against the working tree on 2026-09-28 with `find src/handlers -type f` and `git log`; each implemented row names a real file, and the two unwritten ones are declared absent on this page.
 
 # Pipeline components
 
-Source: `ARCHITECTURE.md` §3.1–§3.4, §3.6 and §3.7. All six functions are
-**specified, not implemented** — the file layout they will occupy is recorded as
-planned in [04-planned-structure](../03-repository/04-planned-structure.md).
+Source: `ARCHITECTURE.md` §3.1–§3.4, §4.2, §3.6 and §3.7. **Four of the six planned
+functions are now implemented** — §3.1, §3.2, §3.4, and the §4.2 query — and documented
+from code in
+[06-handlers](../06-handlers/00-overview.md). This page still records the
+*specification* for each, which is why the component sections below are unchanged. The
+file layout the remaining functions will occupy is in
+[04-planned-structure](../03-repository/04-planned-structure.md).
+
+| § | Component | Status |
+|---|---|---|
+| §3.1 | Webhook handler | **implemented** — `src/handlers/webhookHandler.ts` |
+| §3.2 | Snapshot fetcher | **implemented** — `src/handlers/snapshotFetcher.ts`, with §3.3 folded in by D018 |
+| §3.3 | Bedrock describer | folded into §3.2 — decision D018 |
+| §3.4 | Overlay pusher | **implemented, delivery only** — `src/handlers/overlayPusher.ts`; the picture-in-picture is not implementable, D021 |
+| §4.2 | Event query | **implemented** — `src/handlers/eventQuery.ts`; the spec named no auth, so one was added, D022 |
+| §3.6 | Daily summary | not written |
+| §3.7 | Cross-track adapters | no file in the planned tree |
 
 §3.5, the DynamoDB event store, is documented separately in
 [04-data-store](./04-data-store.md) because it is a data contract rather than a

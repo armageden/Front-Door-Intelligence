@@ -29,9 +29,11 @@ From the two real source documents and their actual structure — the requiremen
 catalogue in `prd.md` §5, the section layout of `ARCHITECTURE.md` §3 and §11, and the
 submission checklist in `prd.md` §13. **Not** from a generic template.
 
-Git history could not contribute: the repository has exactly one commit, adding the two
-spec documents. There is no code history to mine for recurring change shapes yet. When
-code lands, revisit this list against `git log` and re-pick.
+Git history contributed very little, and less than it appears to: the repository has
+three commits, and all three predate the code. The first added the two spec documents,
+the second was a docs pass, and the third was the webhook pipeline. So there is still
+no code *history* to mine for recurring change shapes — only one commit of code. When
+more lands, revisit this list against `git log` and re-pick.
 
 ## Verify after any recipe
 
@@ -39,11 +41,13 @@ code lands, revisit this list against `git log` and re-pick.
 node scripts/docs-check.mjs
 ```
 
-The exact command comes from `commands.docsCheck` in the contract. The other command
-categories in that block — dev, build, test, lint, typecheck, format — are all
-`unavailable`, each with a stated reason. There is no `npm run docs:check` because
-there is no `package.json`; the command becomes a script entry the day a package
-manager is chosen.
+The exact command comes from `commands.docsCheck` in the contract, and it is also the
+`docs:check` script in `package.json`, so `npm run docs:check` works. Either form is
+fine. The remaining command categories in the contract's `commands` block split cleanly:
+**available** — build, build:verify, test, test:coverage, typecheck, all; and
+**unavailable** — dev, lint, format, each with a stated reason. Do not write an
+unavailable one into CI or a script; a command that cannot run fails later, and in a
+worse place.
 
 The nine checks it runs are listed in
 [03-verification-commands](../03-repository/03-verification-commands.md).

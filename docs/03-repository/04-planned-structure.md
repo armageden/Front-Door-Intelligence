@@ -1,19 +1,23 @@
 **Back:** [00-overview](./00-overview.md)
 
-**Verified against:** `ARCHITECTURE.md` §11, read directly; the tree is copied from that section. No path in it exists on disk, which the "expect-absent" declaration on each named path enforces.
+**Verified against:** `ARCHITECTURE.md` §11, read directly; the tree is copied verbatim from that section, so it records intent rather than disk state. Every path's actual status was re-checked against the working tree on 2026-09-28 with `find src test scripts -type f`; the "expect-absent" declaration on each path below is self-invalidating and still passes, so each named path is genuinely absent.
 
-<!-- docs-check:expect-absent docs/PRD.md docs/ARCHITECTURE.md docs/FRICTION_LOG.md FRICTION_LOG.md bedrockDescriber.ts overlayPusher.ts eventQuery.ts dailySummary.ts types/index.ts test/fixtures/ring_motion_event.json -->
+<!-- docs-check:expect-absent docs/PRD.md docs/ARCHITECTURE.md docs/FRICTION_LOG.md FRICTION_LOG.md bedrockDescriber.ts dailySummary.ts types/index.ts test/fixtures/ring_motion_event.json src/handlers/dailySummary.ts -->
 
 # Planned structure
 
-**Everything on this page is a plan, not a description of the working tree.** The tree
-below is copied from `ARCHITECTURE.md` §11 "Repository Structure". Not one path in it
-exists yet — see [01-current-state](./01-current-state.md) for the inventory that
-proves it.
+**The tree below is the plan, not a description of the working tree.** It is copied
+verbatim from `ARCHITECTURE.md` §11 "Repository Structure", so it is a record of what
+the specification asks for — not a claim that any of it is missing. **Most of the paths
+in it now exist.** An earlier version of this page opened by asserting that no path in
+the tree existed on disk, which stopped being true at the tooling phase and stayed
+wrong for three phases after that. The per-path status is the *Reading the tree* table
+below; the authoritative inventory is
+[01-current-state](./01-current-state.md).
 
 It is recorded here, in one place, so that no other document has to invent a file
-layout. When a path in this tree is created, it moves out of this file and into a real
-subject folder.
+layout. When a path in this tree is created, it moves out of the "Still unwritten"
+table into a real subject folder.
 
 ## Planned tree
 
@@ -66,12 +70,12 @@ component sections in [02-pipeline-components](../02-architecture/02-pipeline-co
 
 | Handler file | `ARCHITECTURE.md` section | Status |
 |---|---|---|
-| `webhookHandler.ts` | §3.1 Ring Webhook Ingress | not written |
-| `snapshotFetcher.ts` | §3.2 Snapshot Fetcher | not written |
-| `bedrockDescriber.ts` | §3.3 Bedrock Describer | not written |
-| `overlayPusher.ts` | §3.4 Overlay Pusher | not written |
+| `webhookHandler.ts` | §3.1 Ring Webhook Ingress | **written** |
+| `snapshotFetcher.ts` | §3.2 Snapshot Fetcher | **written** |
+| `bedrockDescriber.ts` | §3.3 Bedrock Describer | folded into `snapshotFetcher.ts` — decision D018 |
+| `overlayPusher.ts` | §3.4 Overlay Pusher | **written**, delivery only — decision D021 |
 | `dailySummary.ts` | §3.6 Daily Summary Generator | not written |
-| `eventQuery.ts` | §4.2 Query Flow — described only in the data flow, with no numbered component section of its own | not written |
+| `eventQuery.ts` | §4.2 Query Flow — described only in the data flow, with no numbered component section of its own | **written** — the one remaining MUST in the core pipeline |
 
 The two that do not appear in the table are accounted for elsewhere: §3.5, the
 DynamoDB event store, is a data contract handled by `dynamoClient.ts` in `lib/`, and
@@ -89,8 +93,16 @@ what remains unwritten:
 | `src/lib/signatureVerifier.ts` | tooling phase | [01-signature-verification](../04-libraries/01-signature-verification.md) |
 | `test/` | tooling phase, partially | [01-signature-verification](../04-libraries/01-signature-verification.md) |
 
-Three of the four `lib/` files remain unwritten, as do all of `src/handlers/`,
-`src/types/`, `firetv/`, and `web/`. The root `package.json` in the tree above also now
+All four planned `lib/` files now exist, as do four of the six handlers. Still
+unwritten: `src/handlers/dailySummary.ts`, the Fire TV app, and the web dashboard — so
+`dailySummary` is now the **only** remaining `src/` file the spec asks for.
+
+Three structures the plan did not list were added: `src/lib/snapshotStore.ts` (the S3
+write and the SQS hand-off), a WebSocket connections table
+(decision D020) backed by `src/lib/connectionStore.ts`, and a second SQS queue for
+overlay delivery backed by `src/lib/overlayPush.ts`. The tree's `src/lib/` block
+therefore lists four files where seven exist. `scripts/` and `AGENTS.md` are likewise
+absent from the specification's tree. The root `package.json` in the tree above also now
 carries a `workspaces` field once `firetv/` and `web/` exist — see
 [02-toolchain](./02-toolchain.md).
 
@@ -114,7 +126,8 @@ documentation set resolves them:
 | `FRICTION_LOG.md` at repo root | Not created | Still owed — FR18. Recipe: [03-add-a-friction-log-entry](../00-how-to/03-add-a-friction-log-entry.md) |
 
 The spec also has no entry for `scripts/`, which now holds
-`scripts/docs-check.mjs`, or for `AGENTS.md`.
+`scripts/docs-check.mjs`, `scripts/build-lambda.mjs`, and `scripts/verify-bundle.mjs`,
+or for `AGENTS.md`.
 
 ## How to retire this file
 
