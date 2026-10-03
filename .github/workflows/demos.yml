@@ -1,0 +1,83 @@
+name: demos
+
+# Publishes the two demo pages to GitHub Pages on every push to main: the dashboard
+# (web/dist/ → /dashboard/) and the Fire TV overlay client (firetv/dist/ → /overlay/),
+# with scripts/demo-landing.html as the site root, so judges and the demo video can open
+# both front ends without building anything.
+#
+# The build commands are not hardcoded here — like docs-check.yml, they are read from
+# commands.<name>.run in the contract, so the workflow cannot drift from the documented
+# commands. This is the same lesson Friction Log Entry 14 taught: derive steps
+# mechanically rather than restating them.
+#
+# One manual step is required once, in the repository settings: Pages → Source →
+# "GitHub Actions". After that, every push to main republishes the demos.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Read build commands from the contract
+        id: builds
+        run: |
+          node -e '
+            const c = require("./docs/.docsrc.json");
+            const names = ["buildWeb", "buildFiretv"];
+            for (const n of names) {
+              const cmd = c.commands[n];
+              if (!cmd || cmd.status !== "available" || !cmd.run) {
+                console.error(`::error::commands.${n} is not "available" in the contract`);
+                process.exit(1);
+              }
+              console.log(`${n}=${cmd.run}`);
+            }
+          ' >> "$GITHUB_OUTPUT"
+
+      - name: Build web dashboard
+        run: ${{ steps.builds.outputs.buildWeb }}
+
+      - name: Build Fire TV overlay client
+        run: ${{ steps.builds.outputs.buildFiretv }}
+
+      - name: Stage the demo site
+        run: |
+          mkdir -p site/dashboard site/overlay
+          cp -r web/dist/. site/dashboard/
+          cp -r firetv/dist/. site/overlay/
+          cp scripts/demo-landing.html site/index.html
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - id: deployment
+        uses: actions/deploy-pages@v4

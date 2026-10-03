@@ -1,6 +1,6 @@
 **Back:** [00-overview](./00-overview.md)
 
-**Verified against:** `src/handlers/eventQuery.ts` → `queryToday()`, `buildTodayResponse()`, `handler()`, `MAX_EVENTS`, `QUERY_KEY_ENV`, `QUERY_KEY_HEADER`, read in full; `test/handlers/eventQuery.test.ts` → 22 passing tests, all run; `src/lib/dynamoClient.ts` → `queryEventsByDate()`, `utcDate()`, read in full; the `EventQueryFunction` resource, its IAM policies, the `QueryApiKey` parameter, and the `EventsQueryEndpoint` output in `template.yaml`, read in full; `QUERY_API_KEY` in `.env.example`. Not verified: any live DynamoDB `Query`, any pre-signed URL, and any API Gateway routing — there is no AWS account and no SAM CLI, so `template.yaml` has never been deployed or validated.
+**Verified against:** `src/handlers/eventQuery.ts` → `queryToday()`, `buildTodayResponse()`, `handler()`, `MAX_EVENTS`, `QUERY_KEY_ENV`, `QUERY_KEY_HEADER`, read in full; `test/handlers/eventQuery.test.ts`, all run; `src/lib/dynamoClient.ts` → `queryEventsByDate()`, `querySummary()`, `isPartitionDate()`, `utcDate()`, read in full; the `EventQueryFunction` resource, its IAM policies, the `QueryApiKey` parameter, and the `EventsQueryEndpoint` output in `template.yaml`, read in full; `QUERY_API_KEY` in `.env.example`. Not verified: any live DynamoDB `Query` or `Get`, any pre-signed URL, and any API Gateway routing — there is no AWS account and no SAM CLI, so `template.yaml` has never been deployed or validated.
 
 # Event query
 
@@ -17,8 +17,8 @@ pipeline stages never had to think about: who is allowed to ask, and what "today
 |---|---|---|
 | `handler` | API Gateway V2 handler | Lambda entry point for `GET /events/today` |
 | `queryToday(presentedKey, params, deps)` | async function | The logic, with every dependency injected. Returns a status and a body rather than throwing |
-| `buildTodayResponse(date, events, presign, maxEvents?)` | async function | Maps stored events to the §5.2 response. Separated from the handler so the response shape is testable with no API Gateway event |
-| `TodayEvent` / `TodayResponse` | type | The response contract |
+| `buildTodayResponse(date, events, presign, maxEvents?, summary?)` | async function | Maps stored events to the §5.2 response. Separated from the handler so the response shape is testable with no API Gateway event |
+| `TodayEvent` / `TodayResponse` / `TodaySummary` | type | The response contract |
 | `MAX_EVENTS` | `const` | `200` — the response ceiling |
 | `QUERY_KEY_ENV` / `QUERY_KEY_HEADER` | `const` | `"QUERY_API_KEY"` / `"x-query-key"` |
 
@@ -97,6 +97,23 @@ Three fields the spec does not have:
 | `sub_type` | the flat subtype, separated out as above |
 | `processed` | lets a dashboard show a pending row rather than a blank |
 | `truncated` | says the ceiling bit, instead of reporting a wrong `count` |
+| `summary` | the day's `§3.6` summary, or `null` — see below |
+
+### The day's summary comes back too
+
+`ARCHITECTURE.md` §3.6 writes the daily summary into the **same partition this endpoint
+reads**, and no other part of the system would ever show it. So the response carries a
+`summary` object — the sentence, whether a model or the deterministic fallback wrote it,
+the `event_count` it covered, and when it was generated — or `null` before the schedule
+has run for that date.
+
+That is an **addition to §5.2**, which specifies no such field, and it is recorded as a
+deviation rather than made silently. It is additive: a client that ignores the field sees
+exactly the §5.2 response.
+
+Reading it is deliberately non-fatal. A failure to read the summary is logged and answered
+with `null`, because losing a convenience field must not lose the day's events — there is a
+test asserting a 200 with `summary: null` when the read throws.
 
 ### Events that are incomplete still appear
 
@@ -134,6 +151,13 @@ a new module was judged not worth the churn for one function.
 `EventQueryFunction` gets `dynamodb:Query` on the events table and `s3:GetObject` on the
 bucket — no `ListBucket`, no `PutObject`, no write action on the table at all. A query
 handler that can delete an event is a query handler one bug away from losing one.
+
+**`dynamodb:GetItem` was added to that policy** when the summary field landed, because
+reading the summary row is a `Get` on its known key and `dynamodb:Query` does not cover
+it. Without it the endpoint would work until a day that had been summarised, then fail
+with an access error — the kind of gap a first deployment finds for you. It is still the
+case that no write action is present, and a test-side check is not a substitute for reading
+the policy.
 
 ## What this does not do
 

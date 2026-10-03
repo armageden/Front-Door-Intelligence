@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Front Door Intelligence — overlay</title>
+    <!--
+      The overlay surface for a television. On Vega OS this page is what loads inside the
+      transparent @amazon-devices/webview sibling of the video surface — the one documented
+      way to overlay anything on Vega; on Fire OS it loads in an Android WebView. No inline
+      script and no inline style, so a Content Security Policy can forbid both, same as the
+      dashboard.
+    -->
+    <link rel="stylesheet" href="./overlay.css" />
+  </head>
+  <body>
+    <p id="demo-banner" hidden>
+      Demo — fixture events pushed through the real overlay client. No backend. Add
+      <code>?endpoint=wss://…</code> to go live.
+    </p>
+    <main id="overlay"></main>
+
+    <script type="module" src="./overlay.js"></script>
+  </body>
+</html>

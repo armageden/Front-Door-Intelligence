@@ -34,6 +34,30 @@ The idempotency table has a 24-hour TTL — long enough to absorb Ring's retry s
 short enough that the table does not grow without bound. This is the storage half of
 NFR2.
 
+## The summary row, and why it has no timestamp in its key
+
+`ARCHITECTURE.md` §3.6 says the daily summary is "written to `EventsTable` as a `summary`
+item" and names no key. It shares the day's partition under a **constant** sort key,
+`summary`, rather than a timestamped one. Three consequences, all of them wanted:
+
+- **It sorts last.** An event's sort key is `timestamp#event_id`, and a timestamp starts
+  with a digit, which sorts before `s`. So the day's events come back in order with the
+  summary at the end, and no read path filters or re-sorts to stay chronological.
+- **The write is idempotent.** One key per day, so a retried or duplicated schedule
+  overwrites rather than accumulating a summary per attempt. That is why the write sends no
+  condition at all.
+- **The read is a `Get`**, on a known key, not a filtered `Query`. The partition is never
+  scanned to find it.
+
+The row carries the sentence, its `summary_source` (`ai` or `fallback`), the `event_count`
+and `counts_by_sub_type` it was built from, and `generated_at`. Those counts are not in the
+specification; they are here so a stored sentence can be interpreted later without
+re-deriving what it covered.
+
+`queryEventsByDate` skips the row by **shape** rather than by a type tag, requiring the
+fields a real event must have. So the read side stays correct whatever else shares the
+partition, including rows this repository has not written yet.
+
 ## Event item schema
 
 ```json

@@ -9,13 +9,17 @@
   },
   "scripts": {
     "docs:check": "node scripts/docs-check.mjs",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && npm run typecheck:web && npm run typecheck:firetv",
+    "typecheck:web": "tsc --noEmit -p web/tsconfig.json",
+    "typecheck:firetv": "tsc --noEmit -p firetv/tsconfig.json",
     "build": "node scripts/build-lambda.mjs",
+    "build:web": "node scripts/build-web.mjs",
+    "build:firetv": "node scripts/build-firetv.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "build:verify": "node scripts/verify-bundle.mjs",
-    "all": "npm run typecheck && npm test && npm run build:verify && npm run docs:check"
+    "all": "npm run typecheck && npm test && npm run build && npm run build:verify && npm run build:web && npm run build:firetv && npm run docs:check"
   },
   "devDependencies": {
     "@types/aws-lambda": "^8.10.163",

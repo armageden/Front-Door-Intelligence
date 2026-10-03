@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Front Door Intelligence — today</title>
+    <!--
+      No inline script and no inline style. The bundle is a separate file so a Content
+      Security Policy can forbid both, which is the cheapest version of "no third-party
+      script runs on this page".
+    -->
+    <link rel="stylesheet" href="./app.css" />
+  </head>
+  <body>
+    <main id="app"></main>
+
+    <!--
+      Operator controls rather than configuration baked into the bundle. The API key is
+      typed into a password field and kept in memory: it is never written to localStorage,
+      never appended to the URL, and never sent anywhere but the configured API host.
+    -->
+    <form id="controls" onsubmit="return false">
+      <label>
+        API base URL
+        <input id="base-url" type="url" placeholder="https://abc123.execute-api.us-east-1.amazonaws.com" />
+      </label>
+      <label>
+        X-Query-Key
+        <input id="api-key" type="password" autocomplete="off" />
+      </label>
+      <label>
+        Date (UTC, optional)
+        <input id="date" type="date" />
+      </label>
+      <button id="refresh" type="button">Load</button>
+    </form>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>

@@ -1,7 +1,8 @@
 name: checks
 
 # Runs every gate that is marked "available" in the docs contract at
-# docs/.docsrc.json: typecheck, test, and docs:check.
+# docs/.docsrc.json: typecheck, test, build, build:verify, build:web, build:firetv, and
+# docs:check — the same commands `npm run all` chains locally, in the same order.
 #
 # Commands are not hardcoded here. Each step reads its command from
 # commands.<name>.run in the contract, so the workflow and the documented
@@ -46,7 +47,7 @@ jobs:
         run: |
           node -e '
             const c = require("./docs/.docsrc.json");
-            const names = ["typecheck", "test", "docsCheck"];
+            const names = ["typecheck", "test", "build", "buildVerify", "buildWeb", "buildFiretv", "docsCheck"];
             for (const n of names) {
               const cmd = c.commands[n];
               if (!cmd || cmd.status !== "available" || !cmd.run) {
@@ -62,6 +63,23 @@ jobs:
 
       - name: Test
         run: ${{ steps.gates.outputs.test }}
+
+      # build:verify asserts against dist/, so the build must run first. The step order is
+      # the whole reason this gate was once missing from CI — see the contract's ci note.
+      - name: Build Lambda bundles
+        run: ${{ steps.gates.outputs.build }}
+
+      - name: Verify Lambda bundles
+        run: ${{ steps.gates.outputs.buildVerify }}
+
+      # Reads web/src/ and writes web/dist/, so unlike build:verify it cannot fail on
+      # ordering.
+      - name: Build web dashboard
+        run: ${{ steps.gates.outputs.buildWeb }}
+
+      # Same shape as build:web — reads firetv/src/, writes firetv/dist/, order-independent.
+      - name: Build Fire TV overlay client
+        run: ${{ steps.gates.outputs.buildFiretv }}
 
       - name: Validate documentation structure
         run: ${{ steps.gates.outputs.docsCheck }}

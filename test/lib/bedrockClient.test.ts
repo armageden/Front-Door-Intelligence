@@ -241,3 +241,43 @@ describe('snapshotStore', () => {
     await expect(store.enqueueForDescribe(EVENT, 'https://sqs.test/queue')).resolves.toBeUndefined();
   });
 });
+
+describe('summariseText', () => {
+  it('sends text and no image, with the caller system prompt and token budget', async () => {
+    const { send, spy } = okWith({ content: [{ type: 'text', text: 'A quiet day.' }] });
+    const client = createBedrockClient({ modelId: MODEL, region: 'us-east-1', send });
+
+    await client.summariseText('UTC date: 2026-02-13', {
+      system: 'Summarize it.',
+      maxTokens: 400,
+    });
+
+    const body = sentBody(spy);
+    expect(body['system']).toBe('Summarize it.');
+    expect(body['max_tokens']).toBe(400);
+    expect(body['temperature']).toBe(TEMPERATURE);
+    expect(JSON.stringify(body)).not.toContain('image');
+  });
+
+  it('uses the same envelope version as the image path', async () => {
+    // One wire format, one version: if these ever diverge it is a bug, not a feature.
+    const { send, spy } = okWith({ content: [{ type: 'text', text: 'A quiet day.' }] });
+    const client = createBedrockClient({ modelId: MODEL, region: 'us-east-1', send });
+
+    await client.summariseText('anything');
+
+    const body = sentBody(spy);
+    expect(body['anthropic_version']).toBe(ANTHROPIC_VERSION);
+    expect(body['max_tokens']).toBe(MAX_TOKENS);
+    expect(body).not.toHaveProperty('system');
+  });
+
+  it('raises the same BedrockError the image path raises', async () => {
+    const send = vi.fn<Send>(async () => {
+      throw new Error('throttled');
+    });
+    const client = createBedrockClient({ modelId: MODEL, region: 'us-east-1', send });
+
+    await expect(client.summariseText('anything')).rejects.toBeInstanceOf(BedrockError);
+  });
+});

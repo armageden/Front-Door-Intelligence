@@ -1,0 +1,11 @@
+{
+  "name": "front-door-web",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Dashboard for GET /events/today. Plain TypeScript, no runtime dependencies.",
+  "type": "module",
+  "scripts": {
+    "build": "node ../scripts/build-web.mjs",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  }
+}

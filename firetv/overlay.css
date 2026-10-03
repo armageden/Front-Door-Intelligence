@@ -1,0 +1,126 @@
+/*
+ * Ten-foot UI: the overlay is read from a couch, so the type is large, the contrast is
+ * high, and the palette matches the dashboard's dark room. rem everywhere so the page
+ * follows the TV's own display scaling.
+ */
+
+:root {
+  color-scheme: dark;
+  --bg: #10131a;
+  --panel: #181d27;
+  --line: #2b3240;
+  --text: #eef1f6;
+  --muted: #9aa4b5;
+  --accent: #7fd1c1;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  color: var(--text);
+  font: 1.25rem/1.5 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+}
+
+#demo-banner {
+  margin: 0;
+  padding: 0.75rem 1.5rem;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+#overlay {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+  padding: 2rem;
+}
+
+.overlay-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+  padding: 1.5rem 2rem;
+  max-width: 46rem;
+  display: grid;
+  gap: 1rem;
+}
+
+.overlay-description {
+  margin: 0;
+  font-size: 2rem;
+  line-height: 1.3;
+}
+
+.overlay-meta {
+  display: flex;
+  gap: 1rem;
+  align-items: baseline;
+}
+
+.overlay-device {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.overlay-time {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  margin-left: auto;
+}
+
+.overlay-card img {
+  width: 100%;
+  max-width: 24rem;
+  border-radius: 0.5rem;
+  display: block;
+}
+
+.overlay-idle {
+  display: grid;
+  gap: 0.5rem;
+  text-align: center;
+}
+
+.overlay-waiting {
+  margin: 0;
+  font-size: 1.5rem;
+  color: var(--muted);
+}
+
+/* FR13: the dismiss action is a real button so a D-pad can focus it. The outline is
+   deliberate — on a TV, the focused control is the only visible cursor. */
+.overlay-dismiss {
+  font: inherit;
+  padding: 0.6rem 2.5rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--accent);
+  background: transparent;
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.overlay-dismiss:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.overlay-status {
+  margin: 0;
+  position: fixed;
+  bottom: 1rem;
+  right: 1.5rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+}

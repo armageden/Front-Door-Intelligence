@@ -50,6 +50,10 @@ describe('describeEvent — happy path', () => {
       description: 'A person places a medium box by the door',
       source: 'ai',
       processed: true,
+      // Reported even though BASE_EVENT already had one, so the caller can persist it. This
+      // shape grew when device-name resolution landed; the assertion is exact on purpose,
+      // because a field appearing here is a change to what gets written back to the event.
+      deviceName: 'Front Door',
     });
   });
 
@@ -69,6 +73,84 @@ describe('describeEvent — happy path', () => {
       'image/jpeg',
     );
     expect(result.snapshotKey).toBe('snapshots/2026-02-13/evt.jpg');
+  });
+});
+
+describe('device name resolution', () => {
+  // Ring sends no device name in any webhook, so it has to be fetched with
+  // GET /v1/devices/{id}. Every event stored before this feature therefore read "at the
+  // door" in the FR11 fallback instead of the camera's actual name.
+  const nameless = (): DoorEvent => {
+    const { device_name: _omitted, ...rest } = BASE_EVENT;
+    return rest;
+  };
+
+  it('puts the resolved name into the FR11 fallback sentence', async () => {
+    const result = await describeEvent({
+      event: nameless(),
+      fetchSnapshot: async () => {
+        throw new Error('media unavailable');
+      },
+      resolveDeviceName: async () => 'Front Door',
+    });
+
+    // This is the whole point: resolve BEFORE building the sentence, not after.
+    expect(result.description).toBe('Person detected at Front Door');
+    expect(result.deviceName).toBe('Front Door');
+  });
+
+  it('resolves the name even when Bedrock answers, and reports it for persistence', async () => {
+    const result = await snapshotOk({
+      event: nameless(),
+      resolveDeviceName: async () => 'Front Door',
+    });
+
+    expect(result.source).toBe('ai');
+    expect(result.deviceName).toBe('Front Door');
+  });
+
+  it('still writes a sentence when the lookup fails', async () => {
+    // A name is cosmetic. Losing it must never cost the event its description.
+    const result = await describeEvent({
+      event: nameless(),
+      fetchSnapshot: async () => {
+        throw new Error('media unavailable');
+      },
+      resolveDeviceName: async () => {
+        throw new Error('401 unauthorized');
+      },
+    });
+
+    expect(result.description).toBe('Person detected at the door');
+    expect(result.deviceName).toBeUndefined();
+  });
+
+  it('treats a blank name as no name rather than writing an empty string', async () => {
+    const result = await snapshotOk({
+      event: nameless(),
+      resolveDeviceName: async () => '   ',
+    });
+
+    expect(result.deviceName).toBeUndefined();
+  });
+
+  it('trims what the API returns', async () => {
+    const result = await snapshotOk({
+      event: nameless(),
+      resolveDeviceName: async () => '  Front Door  ',
+    });
+
+    expect(result.deviceName).toBe('Front Door');
+  });
+
+  it('makes no lookup at all when the event already has a name', async () => {
+    // Ingress cannot know it, but a redelivered message re-reads a row that already has one.
+    // Re-fetching would be a Ring API call for nothing.
+    const resolveDeviceName = vi.fn(async () => 'Front Door');
+    await snapshotOk({ resolveDeviceName });
+
+    // BASE_EVENT carries a device_name, so the stage must not spend a call.
+    expect(resolveDeviceName).not.toHaveBeenCalled();
   });
 });
 

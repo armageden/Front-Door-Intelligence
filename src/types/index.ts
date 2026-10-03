@@ -137,6 +137,56 @@ export interface DoorEvent {
   processed: boolean;
 }
 
+/* ----------------------------------------------------------------- daily summary */
+
+/**
+ * `ai` when the model wrote the sentence, `fallback` when the deterministic local path
+ * ran. The same two values the describe stage records in `description_source`, kept
+ * separate because they describe different text.
+ */
+export type SummarySource = 'ai' | 'fallback';
+
+/**
+ * What the daily-summary stage produces, before it becomes a table item.
+ *
+ * `ARCHITECTURE.md` §3.6 specifies the output as "written to `EventsTable` as a
+ * `summary` item" and nothing else, so the counts and the provenance are this
+ * repository's addition: without them a stored sentence cannot be told apart from a
+ * deterministic one, and the homeowner cannot see how complete the day was.
+ */
+export interface DaySummaryRecord {
+  /** The UTC partition that was summarised, `YYYY-MM-DD`. */
+  date: string;
+  /** The 2-3 sentences. Never empty — the fallback always produces a sentence. */
+  summary: string;
+  summary_source: SummarySource;
+  /** How many events the summary was built from, before any cap. */
+  event_count: number;
+  /**
+   * Counts per Ring `sub_type`, plus two buckets: `unspecified` for an event with no
+   * `sub_type`, and `button_press` for the one event type that has none by design. The
+   * values add up to `event_count`. See `countDay()` in `src/lib/daySummary.ts`.
+   */
+  counts_by_sub_type: Record<string, number>;
+  /** ISO 8601, from the handler's own clock. */
+  generated_at: string;
+  /** The model that produced the text. Absent when the fallback ran. */
+  model?: string;
+}
+
+/**
+ * The stored row.
+ *
+ * `sort_key` is the fixed string `summary`, which puts this row **after** every event
+ * in the same partition — ISO timestamps start with a digit, `s` sorts last — so a
+ * chronological query does not have to filter it out to stay ordered.
+ */
+export interface DaySummaryItem extends DaySummaryRecord {
+  sort_key: string;
+  /** Literal, for a human reading the table. `isDoorEvent` is the actual guard. */
+  item_type: 'summary';
+}
+
 /* ------------------------------------------------------------- ingress results */
 
 export type IngressOutcome =

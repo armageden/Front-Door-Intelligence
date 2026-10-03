@@ -69,6 +69,8 @@ human-readable mirror of this rule is
 | Shared library modules under `src/lib/` | [04-libraries](../04-libraries/00-overview.md) |
 | Official hackathon rules and project-doc conflicts | [05-hackathon-requirements](../05-hackathon-requirements/00-overview.md) |
 | Lambda handlers under `src/handlers/` | [06-handlers](../06-handlers/00-overview.md) |
+| The dashboard in `web/` | [07-web-dashboard](../07-web-dashboard/00-overview.md) |
+| The Fire TV overlay client in `firetv/` | [08-fire-tv-overlay](../08-fire-tv-overlay/00-overview.md) |
 
 ## Agent definition
 

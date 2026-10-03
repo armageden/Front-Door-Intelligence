@@ -1,0 +1,30 @@
+{
+  "$comment": [
+    "The overlay client's own tsconfig, mirroring web/tsconfig.json: a browser surface",
+    "(DOM, no Node types) inside a repository whose root tsconfig is Node-only. A third",
+    "tree, kept separate for the same reason the second one was.",
+    "",
+    "The Vega shell that would host this page imports react and @amazon-devices packages",
+    "that cannot be installed here, so no such file exists — see docs/08-fire-tv-overlay/."
+  ],
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "outDir": "dist",
+    "rootDir": ".",
+
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "exactOptionalPropertyTypes": true,
+
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "noEmit": true
+  },
+  "include": ["src/**/*.ts", "test/**/*.ts"]
+}

@@ -115,12 +115,33 @@ export function createBedrockClient(options: BedrockClientOptions) {
     });
 
   /**
+   * One `InvokeModel` round trip, with the same failure contract for both callers.
+   *
+   * Factored out so the transport — the request envelope, the `send` seam, and the
+   * extraction of text from whichever response shape the model used — exists once.
+   */
+  async function invoke(payload: unknown): Promise<string> {
+    let response: { body: Uint8Array };
+    try {
+      response = await send({
+        modelId,
+        contentType: 'application/json',
+        accept: 'application/json',
+        body: new TextEncoder().encode(JSON.stringify(payload)),
+      });
+    } catch (cause) {
+      throw new BedrockError(modelId, cause);
+    }
+    return extractText(response.body, modelId);
+  }
+
+  /**
    * Describe an image in one sentence.
    *
    * @param imageBytes Raw JPEG bytes, as returned by the Ring media endpoint.
    */
   async function describeImage(imageBytes: Uint8Array): Promise<string> {
-    const payload = {
+    return invoke({
       anthropic_version: ANTHROPIC_VERSION,
       max_tokens: MAX_TOKENS,
       temperature: TEMPERATURE,
@@ -142,24 +163,32 @@ export function createBedrockClient(options: BedrockClientOptions) {
           ],
         },
       ],
-    };
-
-    let response: { body: Uint8Array };
-    try {
-      response = await send({
-        modelId,
-        contentType: 'application/json',
-        accept: 'application/json',
-        body: new TextEncoder().encode(JSON.stringify(payload)),
-      });
-    } catch (cause) {
-      throw new BedrockError(modelId, cause);
-    }
-
-    return extractText(response.body, modelId);
+    });
   }
 
-  return { describeImage, modelId, region };
+  /**
+   * Ask the same model a question in text, with no image.
+   *
+   * Used by `ARCHITECTURE.md` §3.6's daily summary, which is given the day's sentences
+   * rather than the day's images. The prompt and the token budget are the caller's, not
+   * this module's: `src/lib/daySummary.ts` owns the language, and this stays a transport.
+   * The response envelope is identical to the image path, which is the claim that is not
+   * verified — see the module header.
+   */
+  async function summariseText(
+    text: string,
+    options: { system?: string; maxTokens?: number } = {},
+  ): Promise<string> {
+    return invoke({
+      anthropic_version: ANTHROPIC_VERSION,
+      max_tokens: options.maxTokens ?? MAX_TOKENS,
+      temperature: TEMPERATURE,
+      ...(options.system !== undefined ? { system: options.system } : {}),
+      messages: [{ role: 'user', content: [{ type: 'text', text }] }],
+    });
+  }
+
+  return { describeImage, summariseText, modelId, region };
 }
 
 export type BedrockClient = ReturnType<typeof createBedrockClient>;

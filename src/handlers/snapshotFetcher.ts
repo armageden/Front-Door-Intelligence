@@ -62,6 +62,15 @@ export interface DescribeEventOptions {
   readonly store?: {
     putSnapshot: (key: string, bytes: Uint8Array, contentType?: string) => Promise<string>;
   };
+  /**
+   * Resolve the camera's name via `GET /v1/devices/{id}`.
+   *
+   * Injected in tests; in production the handler wires this to `ringClient.getDevice()`.
+   * Returning `undefined` means "the name could not be learned", which is the common case:
+   * Ring sends no device name in any webhook, so it has to be fetched, and a lookup that
+   * fails must not cost the event its description.
+   */
+  readonly resolveDeviceName?: (deviceId: string) => Promise<string | undefined>;
   readonly region?: string;
   readonly modelId?: string;
 }
@@ -71,6 +80,8 @@ export interface DescribeEventResult {
   readonly source: 'ai' | 'fallback';
   readonly snapshotKey?: string;
   readonly processed: boolean;
+  /** The resolved camera name, when one was learned. Absent otherwise. */
+  readonly deviceName?: string;
   /** Set when the description came from the fallback, for logging. */
   readonly reason?: string;
 }
@@ -112,10 +123,36 @@ export async function describeEvent(options: DescribeEventOptions): Promise<Desc
       return client.describeImage(bytes);
     });
 
+  // The device name is resolved BEFORE the fallback sentence is built, not after: the
+  // fallback reads "Person detected at <name>", and resolving it afterwards would produce
+  // "at the door" for an event whose camera is plainly named. A failure is swallowed,
+  // because a name is cosmetic and a missing description is the product failure.
+  let deviceName: string | undefined;
+  if (event.device_name !== undefined && event.device_name.trim().length > 0) {
+    // Already known. Ingress cannot learn it, but a redelivered queue message re-reads a row
+    // that has it, and re-fetching would spend a Ring API call to learn the same string.
+    deviceName = event.device_name.trim();
+  } else if (options.resolveDeviceName !== undefined) {
+    try {
+      const resolved = await options.resolveDeviceName(event.device_id);
+      if (resolved !== undefined && resolved.trim().length > 0) deviceName = resolved.trim();
+    } catch (error) {
+      console.warn('device name lookup failed', {
+        device_id: event.device_id,
+        error: messageOf(error),
+      });
+    }
+  }
+
+  // Every path below describes the event *with* its name, so the FR11 fallback can use it.
+  const named: DoorEvent = deviceName === undefined ? event : { ...event, device_name: deviceName };
+  const withName = deviceName === undefined ? {} : { deviceName };
+
   const fallback = (reason: string): DescribeEventResult => ({
-    description: deterministicDescription(event),
+    description: deterministicDescription(named),
     source: 'fallback',
     processed: true,
+    ...withName,
     reason,
   });
 
@@ -170,6 +207,7 @@ export async function describeEvent(options: DescribeEventOptions): Promise<Desc
       source: 'ai',
       processed: true,
       ...withKey,
+      ...withName,
     };
   } catch (error) {
     if (error instanceof BedrockError) {
@@ -248,6 +286,16 @@ export const handler: SQSHandler = async (event) => {
   const batchItemFailures: { itemIdentifier: string }[] = [];
   const store = createSnapshotStore({ bucket: process.env[SNAPSHOT_BUCKET_ENV] ?? '' });
 
+  // One Ring client for the whole batch, and one device lookup per distinct camera. A batch
+  // of ten events from one doorbell is ten identical GET /v1/devices calls otherwise, and
+  // this is the only non-idempotent-per-event cost in the stage.
+  const ring = createRingClient({
+    clientId: process.env['RING_CLIENT_ID'] ?? '',
+    clientSecret: process.env['RING_CLIENT_SECRET'] ?? '',
+    refreshToken: process.env['RING_REFRESH_TOKEN'] ?? '',
+  });
+  const deviceNames = new Map<string, Promise<string | undefined>>();
+
   const deps: ProcessMessageDeps = {
     loadEvent: (date, eventId, timestamp) => getEvent(date, eventId, timestamp),
     saveOutcome: (stored, result) => markProcessed(stored, result),
@@ -256,6 +304,16 @@ export const handler: SQSHandler = async (event) => {
       return describeEvent({
         event: stored,
         store,
+        resolveDeviceName: (deviceId) => {
+          const existing = deviceNames.get(deviceId);
+          if (existing !== undefined) return existing;
+          const pending = ring
+            .getDevice(deviceId)
+            .then((device) => (device.name.trim().length > 0 ? device.name : undefined))
+            .catch(() => undefined);
+          deviceNames.set(deviceId, pending);
+          return pending;
+        },
         // Omitted rather than passed as undefined: describeEvent falls back to
         // requireEnv, which throws a named error naming the missing variable.
         ...(modelId !== undefined ? { modelId } : {}),

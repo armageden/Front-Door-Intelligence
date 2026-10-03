@@ -1,6 +1,6 @@
 **Verified against:** `docs/.docsrc.json`, the contract this subject is declared in, and the working tree.
 
-<!-- docs-check:expect-absent src/handlers/bedrockDescriber.ts src/handlers/dailySummary.ts -->
+<!-- docs-check:expect-absent src/handlers/bedrockDescriber.ts -->
 
 # 06 — Handlers
 
@@ -10,7 +10,7 @@
 | **Folder** | `docs/06-handlers/` — declared as subject `handlers`, order 6, in [`docs/.docsrc.json`](../.docsrc.json) |
 | **Source of truth** | `src/handlers/` |
 | **Reverse coverage** | Active — `paths.handlerGlobs` and `paths.routeGlobs` are both `src/handlers/**/*.ts`, so an unreferenced handler or route fails the validator |
-| **Status** | Four of six handlers implemented. Only `src/handlers/dailySummary.ts` remains; `src/handlers/bedrockDescriber.ts` was folded into `snapshotFetcher.ts` by decision D018 |
+| **Status** | Five of six handlers implemented. Every `src/` file the spec asks for now exists. `src/handlers/bedrockDescriber.ts` was folded into `snapshotFetcher.ts` by decision D018 |
 
 **Read this when** you need what a handler actually receives, what status it returns,
 and why those status codes were chosen — as opposed to the design intent in
@@ -24,6 +24,8 @@ and why those status codes were chosen — as opposed to the design intent in
 | [02-describe-stage](./02-describe-stage.md) | `snapshotFetcher.ts` → `describeEvent()`, `handler`; the media window, and why every failure still writes a sentence |
 | [03-overlay-push](./03-overlay-push.md) | `overlayPusher.ts` → `deliverEvent()`, `onConnect`, `onDisconnect`; the §3.4 payload, and why the picture-in-picture is not implemented |
 | [04-event-query](./04-event-query.md) | `eventQuery.ts` → `queryToday()`, `buildTodayResponse()`; the auth the spec omitted, and why "today" is UTC and overridable |
+| [05-daily-summary](./05-daily-summary.md) | `dailySummary.ts` → `resolveSummaryDate()`, `generateDaySummary()`, `handler`; which UTC partition gets summarised, and why every run ends in a sentence |
+| [05-daily-summary](./05-daily-summary.md) | `dailySummary.ts` → `resolveSummaryDate()`, `generateDaySummary()`, `handler`; the clock-triggered stage, and which partition it actually summarises |
 
 ## Naming
 

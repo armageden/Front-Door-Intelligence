@@ -1,18 +1,20 @@
 **Back:** [00-overview](./00-overview.md)
 
-**Verified against:** `src/lib/bedrockClient.ts` → `createBedrockClient()`, `describeImage()`, `deterministicDescription()`, `SYSTEM_PROMPT`, `MAX_TOKENS`, `TEMPERATURE`, `BedrockError`, read in full; `test/handlers/snapshotFetcher.test.ts` → the fallback matrix; constants traced to `ARCHITECTURE.md` §3.3 and §8.2. **Not verified in this session:** the Bedrock request envelope — no AWS documentation was fetched while writing this.
+**Verified against:** `src/lib/bedrockClient.ts` → `createBedrockClient()`, `describeImage()`, `summariseText()`, `deterministicDescription()`, `SYSTEM_PROMPT`, `MAX_TOKENS`, `TEMPERATURE`, `BedrockError`, read in full; `test/lib/bedrockClient.test.ts` and `test/handlers/snapshotFetcher.test.ts`, both run; constants traced to `ARCHITECTURE.md` §3.3, §3.6, and §8.2. **Not verified in this session:** the Bedrock request envelope — no AWS documentation was fetched while writing this, and `summariseText` reuses that same unverified envelope.
 
 # Bedrock client
 
-One-sentence image descriptions. Implements **FR5**, carries the **FR9**/**FR10**
-prompt constraint, and supplies the **FR11** deterministic fallback.
+One-sentence image descriptions, plus the text-only call the daily summary needs.
+Implements **FR5**, carries the **FR9**/**FR10** prompt constraint, and supplies the
+**FR11** deterministic fallback.
 
 ## Exported surface
 
 | Export | Kind | Purpose |
 |---|---|---|
-| `createBedrockClient(options)` | factory | Returns `{ describeImage, modelId, region }`. `options.send` is injected in tests, so the AWS SDK is never reached |
+| `createBedrockClient(options)` | factory | Returns `{ describeImage, summariseText, modelId, region }`. `options.send` is injected in tests, so the AWS SDK is never reached |
 | `describeImage(bytes)` | method | JPEG bytes → one-sentence description |
+| `summariseText(text, options?)` | method | Text → text, no image. The call `§3.6` uses. `options.system` and `options.maxTokens` are the caller's |
 | `deterministicDescription(event)` | function | **Pure and synchronous.** FR11's local summary |
 | `SYSTEM_PROMPT` | const | The FR9/FR10 prompt, plus one watermark clause — see below |
 | `MAX_TOKENS` | const | `80`, from `ARCHITECTURE.md` §3.3 |
@@ -21,6 +23,19 @@ prompt constraint, and supplies the **FR11** deterministic fallback.
 | `NOTHING_IDENTIFIABLE` | const | `'Nothing identifiable'` — FR9's own wording |
 | `BedrockError` | error class | Carries `modelId` |
 | `BEDROCK_MODEL_ENV` | const | `'BEDROCK_MODEL_ID'` |
+
+## One transport, two callers
+
+`describeImage` and `summariseText` share a private `invoke()` that owns the request
+envelope, the `send` seam, and `extractText`. That is the point: the two differ only in
+whether the user message carries an image block, so anything they did not share would be a
+place for the wire format to drift.
+
+`summariseText` takes its **system prompt and token budget from the caller** rather than
+defining them. §3.6's prompt is the daily-summary stage's language, not the transport's,
+and it lives in [07-day-summary](./07-day-summary.md) — which is also where the record of
+its three added clauses and its 400-token budget is kept (D026). The default
+`maxTokens` is `MAX_TOKENS`, so a caller who passes nothing gets the one-sentence budget.
 
 ## The prompt, and one deviation you should know about
 
@@ -86,6 +101,11 @@ default rather than a confirmed one. It is the most likely thing to need adjusti
 first real invocation, and the failure mode is loud — an API error, caught and turned
 into `BedrockError`, then handled by the FR11 fallback.
 
+`summariseText` inherits that uncertainty and does not add to it: it sends the same
+envelope with a text-only user message, so fixing the envelope once fixes both callers. A
+test asserts the two paths agree on `anthropic_version` and the default `max_tokens`,
+because a divergence there would be a silent wire-format split.
+
 What *is* verified: the model id, max tokens, temperature, and prompt text all come from
 `ARCHITECTURE.md` §3.3 read directly.
 
@@ -97,9 +117,16 @@ configured** — no alarm is declared in `template.yaml`. That gap is recorded i
 [01-current-state](../03-repository/01-current-state.md) and is the author's to close
 once an account exists.
 
+The daily-summary stage adds two more caps of its own, since a summary is a second kind of
+call on the same model: `SUMMARY_MAX_TOKENS = 400` and `MAX_CONTEXT_EVENTS = 200` in
+[07-day-summary](./07-day-summary.md). Its input is bounded before it ever reaches this
+module.
+
 ## Related
 
-- The stage that calls this: [02-describe-stage](../06-handlers/02-describe-stage.md)
+- The stage that describes an image with this: [02-describe-stage](../06-handlers/02-describe-stage.md)
+- The stage that summarises a day with this: [05-daily-summary](../06-handlers/05-daily-summary.md)
+- That stage's prompt and caps: [07-day-summary](./07-day-summary.md)
 - The Ring client that produces the bytes: [03-ring-client](./03-ring-client.md)
 - The design intent: [02-pipeline-components](../02-architecture/02-pipeline-components.md)
 - Prompt and model requirements: [01-requirements-index](../01-product/01-requirements-index.md)

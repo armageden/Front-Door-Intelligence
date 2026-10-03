@@ -1,0 +1,31 @@
+{
+  "$comment": [
+    "The dashboard's own tsconfig, separate from the root one because the two target",
+    "different runtimes. The root tsconfig is Node: `types: [node]`, no DOM. This one is a",
+    "browser: DOM lib, no Node types. Sharing one config would mean the Lambda code could",
+    "typecheck against browser globals and this code against node:process.",
+    "",
+    "Splitting it also means the root `npm run typecheck` has to run twice — see",
+    "commands.typecheck in docs/.docsrc.json."
+  ],
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "outDir": "dist",
+    "rootDir": ".",
+
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "exactOptionalPropertyTypes": true,
+
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "noEmit": true
+  },
+  "include": ["src/**/*.ts", "test/**/*.ts"]
+}

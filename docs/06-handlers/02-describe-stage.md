@@ -1,6 +1,6 @@
 **Back:** [00-overview](./00-overview.md)
 
-**Verified against:** `src/handlers/snapshotFetcher.ts` → `describeEvent()`, `handler`, `DescribeEventResult`, `SNAPSHOT_TIMEOUT_MS`, read in full; `test/handlers/snapshotFetcher.test.ts` → the failure matrix, all passing; `src/lib/dynamoClient.ts` → `getEvent()` and `markProcessed()`; the queue wiring in `template.yaml` read in full. Not verified: any live Ring or Bedrock call.
+**Verified against:** `src/handlers/snapshotFetcher.ts` → `describeEvent()`, `handler`, `DescribeEventOptions`, `DescribeEventResult`, `SNAPSHOT_TIMEOUT_MS`, `resolveDeviceName`, and the per-invocation device-name memo, read in full; `test/handlers/snapshotFetcher.test.ts` → the failure matrix, all passing; `src/lib/dynamoClient.ts` → `getEvent()` and `markProcessed()`; the queue wiring in `template.yaml` read in full. Not verified: any live Ring or Bedrock call.
 
 # Describe stage
 
@@ -14,12 +14,39 @@ within 5 seconds of the webhook) and **FR5** (Bedrock description), and drives *
 |---|---|---|
 | `describeEvent(options)` | async function | The whole stage, with `fetchSnapshot`, `describeImage`, and `store` all injectable. Returns a `DescribeEventResult` rather than writing, so it is testable with no AWS, no queue, and no clock |
 | `handler` | SQS handler | Consumes the describe queue, one record at a time |
-| `DescribeEventOptions` | type | `{ event, describeImage?, fetchSnapshot?, store?, region?, modelId? }` |
-| `DescribeEventResult` | type | `{ description, source, processed, snapshotKey?, reason? }` |
+| `DescribeEventOptions` | type | `{ event, describeImage?, fetchSnapshot?, store?, resolveDeviceName?, region?, modelId? }` |
+| `DescribeEventResult` | type | `{ description, source, processed, snapshotKey?, deviceName?, reason? }` |
 | `SNAPSHOT_TIMEOUT_MS` | const | `4000` — `ARCHITECTURE.md` §3.2's budget |
 
 `source` is `'ai'` or `'fallback'`, and is persisted as `description_source` on the event
 item, so a demo can show how many descriptions were actually model-generated.
+
+## The device name, and why the ordering is the whole point
+
+`device_name` is the one field ingress cannot know: **no Ring webhook carries it**, so it
+comes from `GET /v1/devices/{id}`. The stage resolves it through
+`resolveDeviceName(deviceId)`, memoised per device id for the batch, and reports it back as
+`deviceName` for `markProcessed` to persist.
+
+**It is resolved before the sentence, not after.** That ordering is the entire substance of
+the feature. FR11's fallback reads `Person detected at <device_name>`; resolving afterwards
+would leave every event reading "at the door" on its first and only pass, with the fix
+arriving on a retry that never comes. A test asserts the fallback says "at Front Door".
+
+Three rules keep it from making the stage less reliable than it was:
+
+| Situation | Behaviour |
+|---|---|
+| Lookup fails or throws | Swallowed and warned. The description is unaffected — a name is cosmetic, a sentence is the product |
+| The API returns a blank name | Treated as no name, so no empty string is ever stored |
+| The event **already** has a name | Not looked up again — a redelivered message re-reads a row that has it |
+
+That last row was not planned: a test asserting the lookup is skipped caught the stage
+re-fetching a name already in hand, which is invisible in one run and obvious in a month's
+API bill. Decision [D031](../02-architecture/06-design-decisions.md).
+
+**Not verified:** `getDevice()` has never made a real Ring call — it is written against the
+documented response shape, and this path inherits that.
 
 ## The design rule: every failure ends in a sentence
 

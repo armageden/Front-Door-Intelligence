@@ -1,0 +1,8 @@
+{
+  "name": "fire-tv-overlay",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Fire TV overlay client — renders the §3.4 payload pushed over the Overlay WebSocket. Plain TypeScript, no framework; hosted in the transparent WebView on Vega OS or an Android WebView on Fire OS.",
+  "license": "MIT",
+  "$comment": "Not an npm workspace — see decision D030, the same constraint as web/package.json. Declares no dependencies: the client is plain TypeScript against the DOM and WebSocket platform APIs."
+}

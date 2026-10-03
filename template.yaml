@@ -5,11 +5,11 @@
 # only for YAML well-formedness and for internal consistency with the code. Treat it
 # as a scaffold, not as a working deployment.
 #
-# It declares exactly what exists today: the webhook ingress function and the two
-# DynamoDB tables it writes to (`ARCHITECTURE.md` §3.1 and §3.5). The snapshot fetcher,
-# Bedrock describer, overlay pusher, event query, and daily summary from §3.2, §3.3,
-# §3.4, §3.6, and §4.2 are NOT here — they are not written. See
-# docs/03-repository/04-planned-structure.md.
+# It declares every stage that exists today: webhook ingress, the describe stage, overlay
+# delivery, the event query, and the daily summary, plus the three DynamoDB tables, two
+# SQS queues, the HTTP API, the WebSocket API, and the snapshot bucket they use. See
+# docs/03-repository/01-current-state.md for the inventory and
+# docs/03-repository/04-planned-structure.md for what is still unwritten.
 #
 # The handler is deployed from compiled JavaScript, not TypeScript. `npm run build`
 # emits CommonJS to dist/, and SAM packages the `dist` directory. The Handler
@@ -19,8 +19,9 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 Description: >-
-  Front Door Intelligence — Ring webhook ingress. Event-driven serverless pipeline
-  described in ARCHITECTURE.md. Only the ingress stage exists so far.
+  Front Door Intelligence — Ring webhook to AI description to Fire TV overlay. Every
+  stage described in ARCHITECTURE.md §3 is written and tested against fakes. Never
+  deployed: no AWS account and no SAM CLI are available in this environment.
 
 Parameters:
   WebhookSecret:
@@ -39,6 +40,10 @@ Parameters:
     Description: Ring Partner API Client Secret (ARCHITECTURE.md §3.1).
   RingRefreshToken:
     Type: String
+    NoEcho: true
+    Description: >-
+      Ring OAuth refresh token, ~30 day lifetime (ARCHITECTURE.md §3.2). Must be
+      refreshed before expiry or the describe stage loses API access.
   QueryApiKey:
     Type: String
     NoEcho: true
@@ -47,10 +52,14 @@ Parameters:
       §5.2 specifies the endpoint but names no auth mechanism; §6's mitigation table omits
       it. Recorded as decision D022. Replace with a real authorizer before any multi-user
       deployment — a static key does not distinguish one homeowner from another.
-    NoEcho: true
+  DailySummaryTimezone:
+    Type: String
+    Default: UTC
     Description: >-
-      Ring OAuth refresh token, ~30 day lifetime (ARCHITECTURE.md §3.2). Must be
-      refreshed before expiry or the describe stage loses API access.
+      IANA timezone the 9 PM daily summary (ARCHITECTURE.md §3.6) is scheduled in. The
+      events table is partitioned by a UTC date, so a zone behind UTC fires after that
+      UTC date has already begun and the summary covers a day that is not over. See
+      decision D025.
   BedrockModelId:
     Type: String
     Default: anthropic.claude-3-haiku-20240307-v1:0
@@ -74,6 +83,24 @@ Parameters:
     Type: Number
     Default: 14
     AllowedValues: [1, 3, 5, 7, 14, 30, 60, 90]
+  BedrockMonthlyBudgetUsd:
+    Type: Number
+    Default: 10
+    MinValue: 1
+    Description: >-
+      Monthly Amazon Bedrock spend, in USD, at which this stack notifies you.
+      ARCHITECTURE.md §6 requires a CloudWatch billing alarm as the detection half of the
+      Bedrock cost-runaway mitigation. See the CostAlarmBedrockBudget resource below for
+      why this is declared as an AWS Budget rather than a CloudWatch alarm, and decision
+      D027. NFR7 asks for free-tier discipline; the default is well inside it.
+  CostAlarmEmail:
+    Type: String
+    Default: ''
+    Description: >-
+      Address notified when the Bedrock budget threshold is crossed. Leave empty to create
+      the budget with no subscriber — AWS sends nothing, but the budget still tracks and
+      appears in the console. AWS requires the address to be confirmed before it will
+      deliver, so the first notification arrives only after that confirmation.
 
 Globals:
   Function:
@@ -112,7 +139,9 @@ Resources:
         - AttributeName: sort_key
           KeyType: RANGE
       BillingMode: PAY_PER_REQUEST
-      # NFR7: the events table is the only durable store, so it keeps everything.
+      # ARCHITECTURE.md §3.5 specifies 90 days. The attribute is declared here AND written by
+      # putEvent/putSummary in src/lib/dynamoClient.ts, both derived from the row's own date
+      # partition rather than from write time. DynamoDB deletes expired items within 48 hours.
       TimeToLiveSpecification:
         AttributeName: expires_at
         Enabled: true
@@ -425,11 +454,14 @@ Resources:
           S3_SNAPSHOT_BUCKET: !Ref SnapshotBucket
       Policies:
         # Read-only. This stage is a query; it must not be able to write or delete an
-        # event, so the events table gets dynamodb:Query and nothing else.
+        # event, so the events table gets read actions and nothing else.
+        # GetItem is here for the day's summary row (§3.6), which is read on its known key
+        # rather than queried. No UpdateItem, no DeleteItem, no Scan.
         - Statement:
             - Effect: Allow
               Action:
                 - dynamodb:Query
+                - dynamodb:GetItem
               Resource: !GetAtt EventsTable.Arn
         # s3:GetObject only, for signing. No ListBucket, no PutObject.
         - Statement:
@@ -443,6 +475,64 @@ Resources:
           Properties:
             Path: /events/today
             Method: GET
+
+  # --- Daily summary (ARCHITECTURE.md §3.6) -------------------------------------
+
+  DailySummaryFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-daily-summary'
+      CodeUri: dist/
+      Handler: handlers/dailySummary.handler
+      Description: >-
+        Summarises one UTC date partition of the events table into 2-3 sentences and
+        writes the result back into that partition as a summary item. Invoked by the
+        schedule below, never by another stage.
+      # Longer than the globals default: a full day's events in one Query plus one Bedrock
+      # call. Nothing on the 5-second webhook path depends on this.
+      Timeout: 120
+      MemorySize: 256
+      Environment:
+        Variables:
+          BEDROCK_MODEL_ID: !Ref BedrockModelId
+          DYNAMODB_EVENTS_TABLE: !Ref EventsTable
+      Policies:
+        # Query and Put only. No Update, no Delete, no Scan: this function reads one
+        # partition and writes exactly one row, and a compromised summary job must not be
+        # able to rewrite an event.
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:Query
+                - dynamodb:PutItem
+              Resource: !GetAtt EventsTable.Arn
+        - Statement:
+            - Effect: Allow
+              Action: [bedrock:InvokeModel]
+              Resource: !Sub 'arn:${AWS::Partition}:bedrock:${AWS::Region}::foundation-model/${BedrockModelId}'
+      Events:
+        DailySummarySchedule:
+          Type: ScheduleV2
+          Properties:
+            # ARCHITECTURE.md §3.6 says 9 PM. That is local time, and the events table is
+            # partitioned by a UTC date (decision D014), so a homeowner in a zone behind
+            # UTC would get a summary of a partition that does not yet hold their evening.
+            # The timezone is a parameter so the operator states which day they mean;
+            # see docs/06-handlers/05-daily-summary.md and decision D025.
+            ScheduleExpression: 'cron(0 21 * * ? *)'
+            # §3.6's "9 PM local" is literal here: EventBridge Scheduler evaluates the cron
+            # in this zone. The consequence is that the partition summarised is a UTC date,
+            # so a zone behind UTC fires after that UTC date has begun — see D025.
+            ScheduleExpressionTimezone: !Ref DailySummaryTimezone
+            Name: !Sub '${AWS::StackName}-daily-summary'
+            Description: >-
+              ARCHITECTURE.md §3.6 daily summary. Reads the UTC date partition for the
+              invocation date and writes one summary row into it. A zone behind UTC shifts
+              which partition gets summarised; see decision D025.
+            State: ENABLED
+      # No SES email. ARCHITECTURE.md §3.6 calls it optional, and it needs a verified
+      # identity and a destination this stack does not have. See the handler's module
+      # header and docs/06-handlers/05-daily-summary.md.
 
   # --- API Gateway (ARCHITECTURE.md §3.1) ---------------------------------------
 
@@ -470,6 +560,100 @@ Resources:
     Properties:
       LogGroupName: !Sub '/aws/lambda/${OverlayFunction}'
       RetentionInDays: !Ref LogRetentionDays
+
+  DailySummaryLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${DailySummaryFunction}'
+      RetentionInDays: !Ref LogRetentionDays
+
+  # --- Cost runaway detection (ARCHITECTURE.md §6) --------------------------------
+  #
+  # §6 names "Max tokens = 80; temperature = 0.2; CloudWatch billing alarm" as the
+  # mitigation for Bedrock cost runaway. The two token levers are in src/lib/, as
+  # src/lib/bedrockClient.ts and src/lib/daySummary.ts document. This is the detection half.
+  #
+  # It is declared as an AWS Budget, not a CloudWatch alarm on EstimatedCharges. That is a
+  # deviation from §6's wording, recorded as decision D027, and the reason is mechanical:
+  #
+  #   - EstimatedCharges is not published until "monitoring and managing costs" is enabled
+  #     per account from the Billing console. A template cannot flip that switch, so a
+  #     CloudWatch alarm declared here would sit permanently in INSUFFICIENT_DATA for every
+  #     account that had not been through the console.
+  #   - The metric lives only in us-east-1 regardless of where the stack is deployed, so
+  #     the alarm's region is not the stack's region.
+  #   - The metric is estimated and arrives several times daily, so it can miss a small
+  #     overrun entirely.
+  #
+  # A Budget needs none of that: it is created by CloudFormation, is account-wide, and
+  # supports FORECASTED as well as ACTUAL, which is the signal that actually catches a
+  # runaway before the money is spent.
+
+  # The budget always exists, so the threshold is tracked whether or not anyone has
+  # supplied an address. The notifications do not, because AWS rejects an empty
+  # subscriber address: a budget with no notifications is valid, a budget with one
+  # subscriber whose address is "" is not. The alternative — defaulting the parameter to a
+  # placeholder address — would create a notification that can never be confirmed and
+  # would fail silently at delivery time, which is the exact failure this resource exists
+  # to catch.
+  CostAlarmBedrockBudget:
+    Type: AWS::Budgets::Budget
+    Condition: HasCostAlarmEmail
+    Properties:
+      Budget:
+        BudgetName: !Sub '${AWS::StackName}-bedrock-monthly'
+        # Scoped to Bedrock alone. An account-wide budget would fire on the NAT gateway or
+        # the logs and tell the operator nothing about the one service this project's cost
+        # risk is in.
+        BudgetType: COST
+        CostFilters:
+          Service:
+            - Amazon Bedrock
+        BudgetLimit:
+          Amount: !Ref BedrockMonthlyBudgetUsd
+          Unit: USD
+        TimeUnit: MONTHLY
+        # No TimePeriod: an end date would make AWS delete the budget and every notification
+        # with it. A budget with no end date is what a permanent cost guard should be.
+      NotificationsWithSubscribers:
+        # FORECASTED at 80% is the notification that matters. An ACTUAL-only budget tells
+        # you what you spent; a forecast tells you what you are about to, which is the
+        # difference between an alert and a post-mortem.
+        - Notification:
+            NotificationType: FORECASTED
+            ComparisonOperator: GREATER_THAN
+            Threshold: 80
+          Subscribers:
+            - SubscriptionType: EMAIL
+              Address: !Ref CostAlarmEmail
+        - Notification:
+            NotificationType: ACTUAL
+            ComparisonOperator: GREATER_THAN
+            Threshold: 100
+          Subscribers:
+            - SubscriptionType: EMAIL
+              Address: !Ref CostAlarmEmail
+
+  # The same budget, tracking-only, for a stack deployed without an address. Having the
+  # threshold visible in the console is worth having even when nobody is subscribed to it.
+  CostAlarmBedrockBudgetNoNotification:
+    Type: AWS::Budgets::Budget
+    Condition: HasNoCostAlarmEmail
+    Properties:
+      Budget:
+        BudgetName: !Sub '${AWS::StackName}-bedrock-monthly'
+        BudgetType: COST
+        CostFilters:
+          Service:
+            - Amazon Bedrock
+        BudgetLimit:
+          Amount: !Ref BedrockMonthlyBudgetUsd
+          Unit: USD
+        TimeUnit: MONTHLY
+
+Conditions:
+  HasCostAlarmEmail: !Not [!Equals [!Ref CostAlarmEmail, '']]
+  HasNoCostAlarmEmail: !Equals [!Ref CostAlarmEmail, '']
 
 Outputs:
   DescribeDeadLetterQueueUrl:
@@ -499,3 +683,15 @@ Outputs:
     Value: !Ref EventsTable
   IdempotencyTableName:
     Value: !Ref IdempotencyTable
+  DailySummaryTimezone:
+    Description: >-
+      The zone the daily summary schedule is evaluated in. If it is behind UTC, the run
+      summarises the UTC date that has just begun rather than the homeowner's finished day
+      — see decision D025.
+    Value: !Ref DailySummaryTimezone
+  BedrockBudgetName:
+    Description: >-
+      The AWS Budget tracking this stack's Bedrock spend (ARCHITECTURE.md §6). Notifications
+      fire only if CostAlarmEmail was supplied AND that address has been confirmed in AWS.
+      Never deployed or validated: no AWS account, no SAM CLI.
+    Value: !If [HasCostAlarmEmail, !Ref CostAlarmBedrockBudget, !Ref CostAlarmBedrockBudgetNoNotification]

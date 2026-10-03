@@ -23,9 +23,10 @@ import {
   MAX_EVENTS,
   QUERY_KEY_ENV,
   QUERY_KEY_HEADER,
+  type TodayResponse,
 } from '../../src/handlers/eventQuery';
 import { utcDate } from '../../src/lib/dynamoClient';
-import type { DoorEvent } from '../../src/types';
+import type { DaySummaryItem, DoorEvent } from '../../src/types';
 import type { QueryDeps } from '../../src/handlers/eventQuery';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 
@@ -48,6 +49,7 @@ const EVENT: DoorEvent = {
 function deps(overrides: Partial<QueryDeps> = {}): QueryDeps {
   return {
     loadEvents: vi.fn(async () => [EVENT]),
+    loadSummary: vi.fn(async () => undefined),
     presign: vi.fn(async () => SIGNED),
     today: () => '2026-02-13',
     authorize: () => true,
@@ -89,6 +91,7 @@ describe('authorisation', () => {
       await expect(
         queryToday(KEY, {}, {
           loadEvents: async () => [EVENT],
+          loadSummary: async () => undefined,
           presign: async () => SIGNED,
           today: () => '2026-02-13',
         }),
@@ -173,7 +176,84 @@ describe('the response shape', () => {
 
   it('returns an empty list, not an error, for a day with no events', async () => {
     const response = await buildTodayResponse('2026-02-13', [], async () => SIGNED);
-    expect(response).toEqual({ date: '2026-02-13', count: 0, truncated: false, events: [] });
+    expect(response).toEqual({
+      date: '2026-02-13',
+      count: 0,
+      truncated: false,
+      events: [],
+      summary: null,
+    });
+  });
+});
+
+describe('the daily summary in the response', () => {
+  const SUMMARY: DaySummaryItem = {
+    date: '2026-02-13',
+    sort_key: 'summary',
+    item_type: 'summary',
+    summary: 'One delivery and one visitor today.',
+    summary_source: 'ai',
+    event_count: 2,
+    counts_by_sub_type: { human: 2 },
+    generated_at: '2026-02-13T21:00:00.000Z',
+  };
+
+  it('is null before the schedule has run, rather than absent or invented', async () => {
+    const result = await queryToday(KEY, {}, deps({ loadSummary: async () => undefined }));
+
+    expect(result.statusCode).toBe(200);
+    expect((result.body as TodayResponse).summary).toBeNull();
+  });
+
+  it('reports the stored sentence, and that the model wrote it', async () => {
+    const result = await queryToday(KEY, {}, deps({ loadSummary: async () => SUMMARY }));
+    const summary = (result.body as TodayResponse).summary;
+
+    expect(summary).toEqual({
+      summary: 'One delivery and one visitor today.',
+      source: 'ai',
+      event_count: 2,
+      generated_at: '2026-02-13T21:00:00.000Z',
+    });
+  });
+
+  it('distinguishes a deterministic summary from a model one', async () => {
+    const result = await queryToday(
+      KEY,
+      {},
+      deps({ loadSummary: async () => ({ ...SUMMARY, summary_source: 'fallback' as const }) }),
+    );
+
+    expect((result.body as TodayResponse).summary?.source).toBe('fallback');
+  });
+
+  it('still answers with the day when the summary cannot be read', async () => {
+    // A convenience field must never take the events down with it.
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    try {
+      const result = await queryToday(
+        KEY,
+        {},
+        deps({
+          loadSummary: async () => {
+            throw new Error('ProvisionedThroughputExceeded');
+          },
+        }),
+      );
+
+      expect(result.statusCode).toBe(200);
+      expect((result.body as TodayResponse).count).toBe(1);
+      expect((result.body as TodayResponse).summary).toBeNull();
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('reads the summary for the same partition it queried', async () => {
+    const loadSummary = vi.fn(async () => undefined);
+    await queryToday(KEY, { date: '2026-01-01' }, deps({ loadSummary }));
+
+    expect(loadSummary).toHaveBeenCalledWith('2026-01-01');
   });
 });
 

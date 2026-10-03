@@ -2,7 +2,6 @@
 
 **Verified against:** `prd.md` §5, read directly; FR1–FR18 and their exact MUST/MAY wording checked against the source. The status column is derived from the working tree, not from the PRD — every row was re-read from the code on 2026-09-28, naming the module that satisfies it. Rows that are not implemented say why, and the two that are *blocked* say so as "not implementable as written" rather than lumping them in with work nobody has started. The Bedrock request envelope and every Ring request shape are verified against documentation, not observed traffic.
 
-<!-- docs-check:expect-absent FRICTION_LOG.md -->
 
 # Functional requirements (FR1–FR18)
 
@@ -19,12 +18,14 @@ derived from what is on disk, not from the PRD's intent.
 | FR4 | For person/motion events, MUST request a camera snapshot via the Ring Partner API within 5 seconds of receiving the webhook | **Implemented, unmeasured** — `snapshotFetcher.ts`; the 5-second budget has never been observed |
 | FR5 | MUST send the snapshot to Amazon Bedrock (Claude or Nova) for a one-sentence natural-language description | **Implemented** — `bedrockClient.describeImage()`, with a Nova response fallback |
 | FR6 | MUST deliver the description + snapshot to a Fire TV overlay within 8 seconds of the original event | **Half** — the message reaches a connected WebSocket client, but no Fire TV app exists and the 8-second target is unmeasured across three queue hops |
-| FR7 | MUST store every processed event in DynamoDB for daily summary generation | **Implemented** — `dynamoClient.putEvent()`; the *summary* half is not, see §3.6 |
+| FR7 | MUST store every processed event in DynamoDB for daily summary generation | **Implemented both ways** — `dynamoClient.putEvent()` stores every event, and `putSummary()` writes the §3.6 daily summary back into the same partition |
 | FR8 | MUST expose a `GET /events/today` endpoint returning all events for the current day | **Implemented** — `eventQuery.ts`, a paginated query on the `date` partition. Returns the UTC day by default and takes `?date=YYYY-MM-DD`; the spec named no auth, so a static `X-Query-Key` was added — decisions D022 and D023 |
 
 FR1–FR8 form the linear chain: webhook → snapshot → Bedrock → overlay → store → query.
-Six of the eight stages are written; the query endpoint and the front end are not. The
-component-by-component design is in
+**All eight are written and tested against fakes**, and the §3.6 daily summary is written
+beside them. The web client exists and renders (see
+[07-web-dashboard](../07-web-dashboard/00-overview.md)); what is missing is the Fire TV
+client, which is why FR6 is recorded as half. The component-by-component design is in
 [02-pipeline-components](../02-architecture/02-pipeline-components.md).
 
 ## 5.2 AI description layer
@@ -75,7 +76,7 @@ adapters inside the Ring entry, never separate submissions.
 
 | ID | Requirement | Status |
 |---|---|---|
-| FR18 | MUST include a `FRICTION_LOG.md` documenting every tooling error, outdated doc, and broken dependency encountered | Not implemented — file does not exist |
+| FR18 | MUST include a `FRICTION_LOG.md` documenting every tooling error, outdated doc, and broken dependency encountered | **Implemented** — 20 entries across all five `prd.md` §12 categories, in the six-field shape Rules §6 requires. Worth up to a recommended 10% Stage One bonus |
 
 FR18 is the only requirement with a named deliverable file that is missing from the
 repo root. The template it must follow is in

@@ -28,15 +28,21 @@
  * the UTC date. A client that cares about local time asks for the partition it wants.
  * Silently serving the UTC day and calling it "today" would be the kind of quiet
  * incorrectness that is much harder to notice than a documented limitation.
+ *
+ * ## The day's summary comes back too
+ *
+ * `ARCHITECTURE.md` §3.6 writes a summary into the same partition this endpoint reads, and
+ * the response now carries it. That is an addition to §5.2, not a correction: without it
+ * the summary would be written once a day and never read by anything.
  */
 
 import type { APIGatewayProxyEventV2, APIGatewayProxyStructuredResultV2 } from 'aws-lambda';
 import { timingSafeEqual } from 'node:crypto';
 
-import { queryEventsByDate, utcDate } from '../lib/dynamoClient';
+import { isPartitionDate, queryEventsByDate, querySummary, utcDate } from '../lib/dynamoClient';
 import { createSnapshotPresigner } from '../lib/overlayPush';
 import { SNAPSHOT_BUCKET_ENV } from '../lib/snapshotStore';
-import type { DoorEvent } from '../types';
+import type { DaySummaryItem, DoorEvent } from '../types';
 
 /** `QUERY_API_KEY`, the shared secret guarding this endpoint. D022. */
 export const QUERY_KEY_ENV = 'QUERY_API_KEY';
@@ -84,6 +90,16 @@ export interface TodayEvent {
   readonly processed: boolean;
 }
 
+export interface TodaySummary {
+  /** The 2-3 sentences from `ARCHITECTURE.md` §3.6. */
+  readonly summary: string;
+  /** `fallback` means the deterministic sentence, not the model. */
+  readonly source: 'ai' | 'fallback';
+  /** Events the summary was built from, which is not always `count`. */
+  readonly event_count: number;
+  readonly generated_at: string;
+}
+
 export interface TodayResponse {
   /** The UTC partition that was actually queried. */
   readonly date: string;
@@ -91,10 +107,21 @@ export interface TodayResponse {
   /** True when `MAX_EVENTS` cut the partition short. */
   readonly truncated: boolean;
   readonly events: readonly TodayEvent[];
+  /**
+   * The day's summary, or `null` before `ARCHITECTURE.md` §3.6 has run.
+   *
+   * **An addition to §5.2**, which specifies no such field. It is here because §3.6 writes
+   * the summary into the same partition this endpoint reads, and nothing else in the system
+   * would ever show it — a stored feature with no reader. The field is additive: a client
+   * that ignores it sees exactly the §5.2 response, and `null` is the honest answer for
+   * the part of every day before the schedule fires.
+   */
+  readonly summary: TodaySummary | null;
 }
 
 export interface QueryDeps {
   readonly loadEvents: (date: string) => Promise<DoorEvent[]>;
+  readonly loadSummary: (date: string) => Promise<DaySummaryItem | undefined>;
   readonly presign: (key: string) => Promise<string>;
   readonly today: () => string;
   readonly maxEvents?: number;
@@ -136,6 +163,7 @@ export async function buildTodayResponse(
   events: readonly DoorEvent[],
   presign: (key: string) => Promise<string>,
   maxEvents: number = MAX_EVENTS,
+  summary: DaySummaryItem | null = null,
 ): Promise<TodayResponse> {
   const truncated = events.length > maxEvents;
   const page = truncated ? events.slice(0, maxEvents) : events;
@@ -159,18 +187,32 @@ export async function buildTodayResponse(
     }),
   );
 
-  return { date, count: mapped.length, truncated, events: mapped };
+  return {
+    date,
+    count: mapped.length,
+    truncated,
+    events: mapped,
+    summary:
+      summary === null
+        ? null
+        : {
+            summary: summary.summary,
+            source: summary.summary_source,
+            event_count: summary.event_count,
+            generated_at: summary.generated_at,
+          },
+  };
 }
 
-/** `YYYY-MM-DD`, or `undefined` when the parameter is not that shape. */
+/**
+ * `YYYY-MM-DD`, or `undefined` when the parameter is not that shape.
+ *
+ * The rule itself lives in `isPartitionDate`, shared with the daily-summary backfill, so
+ * a date that is well formed but impossible is rejected the same way everywhere rather
+ * than in one call site.
+ */
 function parseDateParam(raw: string | undefined): string | undefined {
-  if (raw === undefined || !/^\d{4}-\d{2}-\d{2}$/.test(raw)) return undefined;
-  // Reject dates that parse but do not exist, e.g. 2026-02-31, rather than querying a
-  // partition that can never hold anything.
-  const parsed = new Date(`${raw}T00:00:00.000Z`);
-  if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== raw) {
-    return undefined;
-  }
+  if (raw === undefined || !isPartitionDate(raw)) return undefined;
   return raw;
 }
 
@@ -206,7 +248,18 @@ export async function queryToday(
 
   const date = requested ?? deps.today();
   const events = await deps.loadEvents(date);
-  const body = await buildTodayResponse(date, events, deps.presign, deps.maxEvents);
+  // Read alongside the events rather than instead of them: the summary is a Get on a
+  // known key, so a failure to read it is a missing convenience field, not a failed query.
+  let summary = null;
+  try {
+    summary = (await deps.loadSummary(date)) ?? null;
+  } catch (error) {
+    console.warn('could not read the daily summary', {
+      date,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+  const body = await buildTodayResponse(date, events, deps.presign, deps.maxEvents, summary);
   return { statusCode: 200, body };
 }
 
@@ -217,6 +270,7 @@ export async function handler(
   const bucket = process.env[SNAPSHOT_BUCKET_ENV] ?? '';
   const deps: QueryDeps = {
     loadEvents: (date) => queryEventsByDate(date),
+    loadSummary: (date) => querySummary(date),
     presign: createSnapshotPresigner(bucket),
     today: () => utcDate(),
   };

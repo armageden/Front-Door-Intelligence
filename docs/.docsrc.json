@@ -17,8 +17,8 @@
     "branch": "main",
     "shape": "single-package",
     "workspaces": [],
-    "commitCount": 3,
-    "commitCountNote": "Three commits, all authored before any code existed: the PRD, a docs pass, and the webhook-pipeline implementation. The overlay-delivery phase is uncommitted — see repo shape in 03-repository/01-current-state.md. Git is read-only to agents; the human owns every commit."
+    "commitCount": 5,
+    "commitCountNote": "Five commits, the last two landing the overlay-delivery and event-query stages. The daily-summary, web-dashboard, and demo phases are uncommitted — see repo shape in 03-repository/01-current-state.md. Git is read-only to agents; the human owns every commit."
   },
   "packageManager": {
     "detected": true,
@@ -84,7 +84,7 @@
       "CMakeLists.txt",
       "samconfig.toml"
     ],
-    "note": "ARCHITECTURE.md §8.3 plans `sam build && sam deploy --guided`. template.yaml now exists and declares six AWS::Serverless::Function resources across four source files — webhookHandler.handler, snapshotFetcher.handler, overlayPusher.handler, overlayPusher.onConnect, overlayPusher.onDisconnect, and eventQuery.handler. None of the task-runner files above exists, and no samconfig.toml does. The SAM CLI itself is still unavailable — see commands.dev — so the template has never been built or deployed.",
+    "note": "ARCHITECTURE.md §8.3 plans `sam build && sam deploy --guided`. template.yaml now exists and declares 25 resources, including seven AWS::Serverless::Function resources across five source files — webhookHandler.handler, snapshotFetcher.handler, overlayPusher.handler, overlayPusher.onConnect, overlayPusher.onDisconnect, eventQuery.handler, and dailySummary.handler. Two of the 25 are conditional on CostAlarmEmail being non-empty. None of the task-runner files above exists, and no samconfig.toml does. The SAM CLI itself is still unavailable — see commands.dev — so the template has never been built or deployed.",
     "changedFrom": {
       "previous": "detected: false — no template.yaml and no task runner",
       "reason": "The webhook-ingress and overlay-delivery phases created template.yaml. The contract is updated to match reality rather than the plan being worked around."
@@ -117,6 +117,28 @@
       "outputs": "dist/",
       "note": "node scripts/build-lambda.mjs. esbuild bundles every file in src/handlers/ into a self-contained CommonJS file in dist/, preserving the src/handlers/ path that template.yaml's Handler property expects. Bundling rather than tsc emit is required because the AWS SDK v3 is not in the Lambda runtime, so a dist/ of loose files would deploy a handler that cannot require its own dependencies."
     },
+    "buildWeb": {
+      "status": "available",
+      "run": "npm run build:web",
+      "binary": "npm",
+      "args": [
+        "run",
+        "build:web"
+      ],
+      "outputs": "web/dist/",
+      "note": "node scripts/build-web.mjs. esbuild bundles web/src/ into web/dist/app.js as an ES module for the browser, and copies index.html and app.css beside it. platform: browser, not node, is the line that matters: under platform: node esbuild would leave a require() a browser cannot execute. The dashboard has no dependencies to inline, so this is not a bundling-for-deployment problem like commands.build — it exists to give the browser one module URL instead of four and to fail loudly on a parse error. Its output is NOT checked by commands.buildVerify, which asserts the Lambda bundles in dist/."
+    },
+    "buildFiretv": {
+      "status": "available",
+      "run": "npm run build:firetv",
+      "binary": "npm",
+      "args": [
+        "run",
+        "build:firetv"
+      ],
+      "outputs": "firetv/dist/",
+      "note": "node scripts/build-firetv.mjs. esbuild bundles firetv/src/ into firetv/dist/overlay.js as an ES module for the WebView that hosts the overlay, and copies overlay.html and overlay.css beside it. platform: browser, for the same reason as buildWeb. It reads firetv/src/ and writes firetv/dist/, so it cannot fail on ordering; it is in CI and in commands.all for parity rather than because anything asserts on its output. There is no verify-bundle equivalent: the overlay has no dependencies to inline and its output is not a Lambda."
+    },
     "test": {
       "status": "available",
       "run": "npm test",
@@ -135,7 +157,7 @@
         "test:coverage"
       ],
       "metric": "require('./coverage/coverage-summary.json').total.lines.pct",
-      "metricNote": "The first real single-number metric this repository has had, and therefore the first thing an optimisation loop could measure. It read 80.43% line coverage on 2026-09-28 across 8 test files. The uncovered remainder is dominated by default AWS-client construction in snapshotStore and connectionStore, which needs an AWS account to exercise, plus the SQS handler adapters. Those are recorded per module rather than left as a vague gap."
+      "metricNote": "The first real single-number metric this repository has had, and therefore the first thing an optimisation loop could measure. The current figure is reported in docs/03-repository/03-verification-commands.md, which is where the number is re-read from coverage/coverage-summary.json after every run; this note deliberately does not duplicate it, because a stale percentage in the contract is worse than none. The uncovered remainder is dominated by default AWS-client construction in snapshotStore and connectionStore, which needs an AWS account to exercise, plus the SQS and schedule handler adapters. Those are recorded per module rather than left as a vague gap."
     },
     "typecheck": {
       "status": "available",
@@ -145,7 +167,7 @@
         "run",
         "typecheck"
       ],
-      "note": "tsc --noEmit in strict mode, covering test/ as well as src/. Test files are typechecked, so mocks must match the real signatures — which has caught genuine drift twice."
+      "note": "tsc --noEmit in strict mode, covering test/ as well as src/, then two more passes over the browser surfaces, web/ and firetv/, each with a DOM lib. Three invocations because the repository targets three runtimes: the Lambda code is Node (types: [node], no DOM) and the dashboard and overlay client are browsers (DOM, no Node types). Sharing one config would let each side typecheck against the other's globals. Browser test files are typechecked on their own side, so mocks must match the real signatures. typecheck:web and typecheck:firetv exist so the second and third passes can be run on their own."
     },
     "lint": {
       "status": "unavailable",
@@ -169,13 +191,13 @@
     },
     "all": {
       "status": "available",
-      "run": "npm run typecheck && npm test && npm run build:verify && npm run docs:check",
+      "run": "npm run typecheck && npm test && npm run build && npm run build:verify && npm run build:web && npm run build:firetv && npm run docs:check",
       "binary": "npm",
       "args": [
         "run",
         "all"
       ],
-      "note": "Every gate in one command. Wired as the single local pre-commit substitute and used by the author to close each phase. CI runs the same four steps, individually, so one failing step is identifiable."
+      "note": "Every gate in one command. Wired as the single local pre-commit substitute and used by the author to close each phase. commands.build appears before buildVerify: the gate asserts against dist/, and until 2026-10-04 `all` assumed dist/ already existed — which made it fail on a clean checkout and let a stale dist/ pass the gate against changed source. Building first fixed both, and made `all` step-for-step identical to CI. buildFiretv sits beside buildWeb: order-independent, in the chain for parity with CI. See ci.workflows[0].note."
     }
   },
   "paths": {
@@ -199,7 +221,9 @@
     "libGlobs": [
       "src/lib/**/*.ts"
     ],
-    "libGlobsNote": "Reverse coverage for shared library modules. Active as of the tooling phase, so a module under src/lib/ that no document mentions now fails the validator. This is what makes reverse coverage APPLICABLE for the first time.",
+    "libGlobsNote": "Reverse coverage for shared library modules. Active as of the tooling phase, so a module under src/lib/ that no document mentions now fails the validator. This is what makes reverse coverage APPLICABLE for the first time. Note that this glob is anchored at the repository root: web/src/api.ts matches NEITHER this nor handlerGlobs, so the dashboard has no reverse coverage at all. See limitations.",
+    "webGlobs": [],
+    "webGlobsNote": "Intentionally empty. Populated by the web-dashboard phase only if webGlobs is filled in with web/src/**/*.ts, and that is blocked on a real problem: check 5's globs are also read by nothing else, but a web module imported by a test under test/ fails to resolve under the root Node tsconfig, so reverse coverage for web/ needs the test tree moved first. The dashboard is documented by hand in docs/07-web-dashboard/ instead, and check 5's blind spot for it is recorded in limitations.",
     "excludeGlobs": [
       "**/node_modules/**",
       "dist/**",
@@ -435,9 +459,25 @@
       "title": "Handlers",
       "covers": "Lambda request handlers under src/handlers — what each receives, what status it returns, and why",
       "readWhen": "You need a handler's real input contract, its status-code policy, or its failure modes"
+    },
+    {
+      "id": "web-dashboard",
+      "order": 7,
+      "folder": "07-web-dashboard",
+      "title": "Web dashboard",
+      "covers": "The browser client in web/ — the layers, the fixture-data demo, what it refuses to claim, and why it is not the React app the spec sketches",
+      "readWhen": "You are changing what a homeowner sees, or you want to know why the dashboard makes no claims it cannot support"
+    },
+    {
+      "id": "fire-tv-overlay",
+      "order": 8,
+      "folder": "08-fire-tv-overlay",
+      "title": "Fire TV overlay",
+      "covers": "The overlay client in firetv/ — the §3.4 payload it renders, the two overlay behaviours a client can implement (FR13, FR14), and the WebView hosting path on Vega OS and Fire OS",
+      "readWhen": "You are changing what a television shows when the doorbell rings, or you want to know why the client is a web page rather than a Vega app"
     }
   ],
-  "subjectsNote": "Order is reading priority, not creation order. Numbers are NN prefixes on folder names and must match the order value. The validator fails if a docs/NN-* folder has no entry here, or if an entry here has no folder, or if NN disagrees with order. That is what makes silent renumbering impossible.",
+  "subjectsNote": "Order is reading priority, not creation order. Numbers are NN prefixes on folder names and must match the order value. The validator fails if a docs/NN-* folder has no entry here, or if an entry here has no folder, or if NN disagrees with order. That is what makes silent renumbering impossible. Orders are also unique: two subjects cannot share a number, so a new subject always takes the next unused one rather than an attractive lower one.",
   "reverseCoverage": {
     "intentionallyUndocumented": [],
     "intentionallyUndocumentedNote": "Entries are { path, reason }. A matching file is exempted from reverse coverage with the reason printed in the run summary. Keep this list empty unless a file genuinely should not be described."
@@ -479,9 +519,26 @@
         "runsSteps": [
           "typecheck",
           "test",
+          "build",
+          "buildVerify",
+          "buildWeb",
+          "buildFiretv",
           "docsCheck"
         ],
-        "note": "One job runs three of the four available gates: typecheck, test, and docs:check. build:verify is deliberately NOT in CI yet, and that is a gap rather than a design. It is order-dependent — scripts/verify-bundle.mjs asserts against dist/, which only exists after commands.build runs, and the workflow has no build step, so adding the gate alone would make CI fail on a missing directory. Adding it means adding `npm run build` first. Recorded here as a finding for the author, not silently papered over. Note also that `npm run all` locally does run build:verify, so the local gate is stronger than the CI gate."
+        "note": "One job runs all five available gates, in the order `npm run all` chains them: typecheck, test, build, build:verify, build:web, build:firetv, and docs:check. build:verify was closed into CI on 2026-10-04 after being recorded as a gap: the gate is order-dependent — scripts/verify-bundle.mjs asserts against dist/, which only exists after commands.build runs — so closing it meant adding the build step before it, not the gate alone. The workflow had previously carried the gate in its documented step list without a build step to feed it, which is the failure Friction Log Entry 14 describes. build:web and build:firetv stay last-but-two for the same reason they were always safe: each reads one source tree and writes its own dist/, so no ordering can break them. Note that their outputs, web/dist/ and firetv/dist/, are not gitignored, so CI writes them and discards them — that is deliberate, since both surfaces deploy as static files rather than from this repository."
+      },
+      {
+        "path": ".github/workflows/demos.yml",
+        "jobs": [
+          "deploy"
+        ],
+        "matrixAxes": [],
+        "matrixValues": [],
+        "runsSteps": [
+          "buildWeb",
+          "buildFiretv"
+        ],
+        "note": "Publishes the two demo pages to GitHub Pages on every push to main: web/dist/ under /dashboard/, firetv/dist/ under /overlay/, and scripts/demo-landing.html as the site root. Reads its build commands from the contract exactly like the checks workflow, per Entry 14's own suggestion. It runs no gates — checks runs them — and requires a one-time manual enable: repo settings, Pages, Source = GitHub Actions. Until that enable happens and the human pushes, the published URL does not exist; do not cite a Pages URL as live before both. Added 2026-10-04 as the durable hosting path for the demos (decision D035)."
       }
     ]
   },
@@ -502,14 +559,25 @@
   "limitations": [
     "This contract records discovered reality as of 2026-09-28. It is a description, not an enforcement of the build.",
     "docs-check proves document structure, not truth. It cannot confirm that a documented auth requirement, status code, parameter, or behaviour actually matches the handler, because it does not read semantics. A passing docs:check is never evidence that the docs are correct.",
+    "Device names are now resolved, but never observed. src/lib/ringClient.getDevice() is called by the describe stage since decision D031, and it has still never made a real Ring request: the response shape is verified against documentation, not traffic. Nothing depends on the name being correct — a failed lookup costs the event its name and nothing else.",
+    "web/ has NO reverse coverage. paths.libGlobs and paths.handlerGlobs are src/** only, so a new file under web/src/ will not fail the validator if the documentation stops naming it. The dashboard is currently documented by hand in docs/07-web-dashboard/01-dashboard.md. Widening the globs is blocked on a second problem: the root tsconfig is Node-only and the dashboard is browser-only, so a web module imported by a suite under test/ cannot resolve. Both trees are kept separate on purpose (decision D029); the globs should follow, not lead.",
+    "firetv/ has the same NO-reverse-coverage gap as web/, for the same reason: it is a third typechecking tree (Node root, two browser surfaces), documented by hand in docs/08-fire-tv-overlay/. Three trees now share the pattern: the root tsconfig is Node-only, and each browser surface carries its own DOM tsconfig and its own copy of the small fake DOM.",
+    "The dashboard is not React. ARCHITECTURE.md §11 sketches web/src/App.tsx and components/EventTimeline.tsx. What exists is four TypeScript files with no dependencies, because npm install hangs in this environment and react cannot be fetched. Recorded as decision D029, along with the loss that implies: no JSX, no component structure. The layer split means a later swap touches only app.ts, main.ts, and the build.",
+    "No npm workspaces field is declared even though web/package.json now exists, because CI runs npm ci and a lockfile that does not record the new workspace fails outright rather than repairing itself. Regenerating the lockfile needs an install, which does not work here. Recorded as decision D030. Cost today is nil: web/package.json declares no dependencies.",
     "Reverse coverage is ACTIVE for src/lib, src/handlers, and route handlers. A new file in any of them that no document names fails the validator. This proved its worth in the query phase: creating src/handlers/eventQuery.ts failed check 1 in five documents at once, because five separate expect-absent declarations had listed it. That is the mechanism working, not a nuisance.",
     "GET /events/today required an auth mechanism that ARCHITECTURE.md does not specify. A static X-Query-Key was added, fails closed when unset, and is recorded as decision D022. There is still no per-account separation: one table, one key, one homeowner. Not deployable for a real multi-user product.",
-    "The events table is partitioned by a UTC date (D014) and GET /events/today defaults to that partition, overridable with ?date=. A homeowner's local day is not computed anywhere. The dashboard that would need it does not exist.",
+    "GET /events/today returns an extra `summary` field that ARCHITECTURE.md §5.2 does not specify, because §3.6 writes the daily summary into the same partition and nothing else would read it. The field is additive and `null` before the schedule runs. The dashboard renders it, including the fallback-source label, and did so in a real browser on 2026-10-04 — but never against a deployed backend.",
+    "The events table is partitioned by a UTC date (D014) and GET /events/today defaults to that partition, overridable with ?date=. A homeowner's local day is not computed anywhere; the dashboard exposes the ?date= override as a date input, which is as far as local time is handled.",
     "template.yaml has never been deployed or validated. No AWS account and no SAM CLI are available, so it is checked only for YAML well-formedness and for consistency with the build output. Every Handler path is asserted to match a real file in dist/, and that is as far as verification goes.",
     "Nothing in src/lib/ringClient.ts or src/lib/bedrockClient.ts has been exercised against live AWS or Ring. There is no webhook or media simulator; the Developer Playground issues tokens and simulates live view only. Every request shape is verified against documentation, not observed traffic.",
     "The Bedrock request envelope is the least-verified thing in the repository: no AWS documentation was fetched while writing it. It fails loudly, as an API error caught into the FR11 fallback, rather than silently.",
     "The trigger for EncryptedMediaError is an inference, not a documented fact: Ring states TAKE/E2EE media comes back encrypted but publishes no status code or content type for it. Recorded as decision D016.",
-    "The picture-in-picture overlay specified in ARCHITECTURE.md 3.4 is NOT implemented, because no documented Vega OS API supports it. The delivery half is implemented. Recorded as decision D021.",
+    "The picture-in-picture overlay specified in ARCHITECTURE.md 3.4 is NOT implemented, because no documented Vega OS API supports it. The delivery half is implemented, and since D034 the client side is too — on the WebView surface Vega does sanction — but FR12, appearing over another app's playback, remains a platform limit. Recorded as decision D021.",
+    "ARCHITECTURE.md §6 asks for a CloudWatch billing alarm against Bedrock cost runaway. An AWS Budget filtered to the Bedrock service is declared instead, because EstimatedCharges must be enabled per account from the Billing console and a template cannot do that. Recorded as decision D027. The budget has never been created and no notification has ever been sent.",
+    "Event and summary rows now write the 90-day expires_at that ARCHITECTURE.md §3.5 specifies, measured from the row's own date partition rather than from write time so a retry cannot extend retention. DynamoDB's documented 48-hour deletion lag has not been observed. Recorded as decision D028.",
+    "The daily summary is scheduled in a timezone parameter but reads a UTC date partition, so a zone behind UTC fires after that partition has begun. The default is UTC, where the two agree. Recorded as decision D025.",
+    "The §3.6 summary prompt is the specified text plus three appended clauses, and the stage uses 400 max tokens rather than §3.3's 80. Both are deviations from the specification, recorded as decision D026.",
+    "§3.6's optional SES email is not implemented. It needs a verified identity, a destination address, and an unsubscribe path, none of which the specification names. The summary is readable through GET /events/today instead.",
     "FR6's 8-second end-to-end target is unmeasured and at risk: the path is three queue hops and the Bedrock call alone is several seconds. FR4's 5-second snapshot target is likewise unmeasured."
   ]
 }

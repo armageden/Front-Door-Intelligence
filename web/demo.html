@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Front Door Intelligence — demo</title>
+    <!--
+      Same shape as index.html: no inline script and no inline style, so a Content Security
+      Policy can forbid both. The one deliberate difference is the banner, which says out
+      loud that the data on this page is a fixture — the rendering code below it is the
+      production dashboard, but nothing on this page was recorded at a real front door.
+    -->
+    <link rel="stylesheet" href="./app.css" />
+  </head>
+  <body>
+    <p class="demo-banner">
+      Demo — this page renders <strong>fixture data</strong> through the real dashboard code.
+      There is no backend behind it and nothing happened at any front door.
+    </p>
+    <main id="app"></main>
+
+    <script type="module" src="./demo.js"></script>
+  </body>
+</html>

@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Front Door Intelligence — demos</title>
+    <!--
+      The landing page for the hosted demos. Staged by .github/workflows/demos.yml at
+      deploy time: web/dist/ lands under ./dashboard/, firetv/dist/ under ./overlay/,
+      and this file becomes the site root. Static, no scripts, palette matched to both
+      front ends. Everything below says out loud that the demos run fixture data — the
+      same honesty rule the demos themselves follow.
+    -->
+    <style>
+      :root { color-scheme: dark; --bg:#10131a; --panel:#181d27; --line:#2b3240; --text:#eef1f6; --muted:#9aa4b5; --accent:#7fd1c1; }
+      * { box-sizing: border-box; }
+      body { margin:0; min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1.25rem; background:var(--bg); color:var(--text); font:1.1rem/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; padding:2rem; }
+      h1 { font-size:1.6rem; margin:0; }
+      p.sub { margin:0; color:var(--muted); max-width:44rem; text-align:center; }
+      a.card { display:block; width:min(30rem,100%); background:var(--panel); border:1px solid var(--line); border-radius:.75rem; padding:1.25rem 1.5rem; color:var(--text); text-decoration:none; }
+      a.card:hover { border-color:var(--accent); }
+      a.card strong { color:var(--accent); display:block; margin-bottom:.35rem; }
+      a.card span { color:var(--muted); font-size:.95rem; }
+      footer { color:var(--muted); font-size:.85rem; max-width:44rem; text-align:center; }
+    </style>
+  </head>
+  <body>
+    <h1>Front Door Intelligence</h1>
+    <p class="sub">A Ring doorbell press becomes one sentence of plain English on your TV. Amazon Developer Hackathon 2026 — Ring track. Both demos below run fixture data through the production code; nothing at a real front door was recorded.</p>
+    <a class="card" href="./overlay/overlay.html">
+      <strong>Fire TV overlay — the moment</strong>
+      <span>What a television shows when the doorbell rings: the sentence, the snapshot, a 15-second auto-dismiss, and a dismiss button. New fixture events arrive every few seconds.</span>
+    </a>
+    <a class="card" href="./dashboard/demo.html">
+      <strong>Web dashboard — the day</strong>
+      <span>What the homeowner reviews at the end of the day: every event, its snapshot, and a summary of the day, with pending events shown honestly.</span>
+    </a>
+    <footer>The dashboard's live page (<a style="color:var(--accent)" href="./dashboard/index.html">here</a>) is the same client pointed at a real deployment; without one it renders its honest error state. The code behind both demos, and the five backend stages, are in the submission repository.</footer>
+  </body>
+</html>

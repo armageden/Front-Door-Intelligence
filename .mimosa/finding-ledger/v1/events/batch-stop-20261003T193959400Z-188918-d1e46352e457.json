@@ -1,0 +1,64 @@
+{
+  "schemaVersion": "mimosa-finding-ledger-batch/v1",
+  "batchId": "stop-20261003T193959400Z-188918-d1e46352e457",
+  "runId": "20261003T193959400Z-188918-d1e46352e457",
+  "runStatus": "completed",
+  "coverage": {
+    "status": "complete",
+    "reasons": []
+  },
+  "source": {
+    "component": "zcode-hook",
+    "operationId": "Stop"
+  },
+  "revision": "f364d391eb302794b0825508680a1779c74a83e2",
+  "diffHash": "0766d64646fa5976bb5394c06d6d3425e3620a8fa5116148495c2a47e6adcc5e",
+  "rulesVersion": "unavailable",
+  "sessionHash": "f2daebef5cf43e17f884e9fd0368159ea8863875ff75581686d247b6be383534",
+  "reportRef": ".mimosa/reports/task-review-sess_a518ffa1-0986-4fd9-b368-bab9393a879b-20261003T193959400Z-188918-d1e46352e457.json",
+  "events": [],
+  "observedFindingIds": [],
+  "verifiedFiles": [
+    {
+      "file": "firetv/src/client.ts",
+      "direct": "complete",
+      "projectContext": "partial"
+    },
+    {
+      "file": "firetv/src/view.ts",
+      "direct": "complete",
+      "projectContext": "partial"
+    },
+    {
+      "file": "firetv/src/app.ts",
+      "direct": "complete",
+      "projectContext": "partial"
+    },
+    {
+      "file": "firetv/src/main.ts",
+      "direct": "complete",
+      "projectContext": "partial"
+    },
+    {
+      "file": "firetv/test/fake-dom.ts",
+      "direct": "complete",
+      "projectContext": "partial"
+    },
+    {
+      "file": "firetv/test/client.test.ts",
+      "direct": "complete",
+      "projectContext": "partial"
+    },
+    {
+      "file": "firetv/test/app.test.ts",
+      "direct": "complete",
+      "projectContext": "partial"
+    },
+    {
+      "file": "vitest.config.ts",
+      "direct": "complete",
+      "projectContext": "partial"
+    }
+  ],
+  "recordedAt": "2026-10-03T19:39:59.798Z"
+}

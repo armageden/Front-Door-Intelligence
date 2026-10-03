@@ -8,7 +8,7 @@
 | **Folder** | `docs/04-libraries/` — declared as subject `libraries`, order 4, in [`docs/.docsrc.json`](../.docsrc.json) |
 | **Source of truth** | `src/lib/` |
 | **Reverse coverage** | Active — `paths.libGlobs` is `src/lib/**/*.ts`, so an undocumented module here fails the validator |
-| **Status** | Seven modules implemented. Every client named in `ARCHITECTURE.md` §11 now exists, plus the WebSocket connection registry. |
+| **Status** | Eight modules implemented. Every client named in `ARCHITECTURE.md` §11 now exists, plus the WebSocket connection registry and the daily-summary text module. |
 
 **Read this when** you need the real signature, return shape, or failure modes of a
 shared module — as opposed to the design intent, which lives in
@@ -27,6 +27,8 @@ specification**. Every claim on these pages was read out of a file on disk.
 | [04-bedrock-client](./04-bedrock-client.md) | `bedrockClient.ts` → `describeImage()`, the FR9/FR10 prompt, and FR11's deterministic fallback |
 | [05-snapshot-store](./05-snapshot-store.md) | `snapshotStore.ts` → S3 snapshot keys and the SQS hand-off to the describe stage |
 | [06-overlay-push](./06-overlay-push.md) | `overlayPush.ts` and `connectionStore.ts` → the §3.4 payload, per-connection fan-out, the WebSocket connection registry, and the shared snapshot pre-signer |
+| [07-day-summary](./07-day-summary.md) | `daySummary.ts` → the §3.6 prompt, the day's counts, and the deterministic sentence written when the model is unavailable |
+| [07-day-summary](./07-day-summary.md) | `daySummary.ts` → §3.6's prompt, the day's counts, and the deterministic fallback. Content only — the handler does not exist |
 
 ## Naming
 

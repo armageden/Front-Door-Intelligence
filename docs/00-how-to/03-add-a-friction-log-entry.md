@@ -2,7 +2,6 @@
 
 **Verified against:** `ARCHITECTURE.md` §10, §14 and §15, and `prd.md` §9, §12 and §13, read directly. The `FRICTION_LOG.md` template is quoted from `ARCHITECTURE.md` §10; the file itself does not exist yet.
 
-<!-- docs-check:expect-absent FRICTION_LOG.md -->
 
 # Recipe: add a friction log entry
 
@@ -22,22 +21,31 @@ first step, and it is the single highest-leverage thing you can add to the repo 
 
 ## Steps
 
-1. **Create the file at the repo root** with the structure from `ARCHITECTURE.md` §10:
+1. **Create the file at the repo root** in the six-field shape the Rules require.
+   `FRICTION_LOG.md` now exists and holds 20 entries, so read it for tone and specificity
+   before adding to it:
 
    ```markdown
    # Friction Log — Front Door Intelligence
 
    ## Ring API
 
-   ### Entry 1: Webhook signature verification docs incomplete
-   - **What I tried:** Following Ring's webhook setup guide
-   - **What happened:** The `X-Signature` header format was not documented for HMAC-SHA256
-   - **Impact:** 2 hours lost reverse-engineering the signature format
-   - **Suggested fix:** Add a code example for Node.js signature verification
+   ### Entry 1: <a specific, falsifiable title — not "docs were wrong">
+   - **Task attempted:** what you were trying to do
+   - **Steps taken:** what you actually did
+   - **Expected vs actual:** what you expected, and what happened instead
+   - **Severity rating:** High | Medium | Low
+   - **Workaround used:** how you got unblocked, naming the file or setting
+   - **Actionable suggestion:** what the platform should document or fix
    ```
 
-   Four fields, in this order: **What I tried**, **What happened**, **Impact**,
-   **Suggested fix**. Impact is stated concretely — hours lost, or what it blocked.
+   **Use the six fields from the Official Rules, not the four in `ARCHITECTURE.md` §10.**
+   Rules §6 defines the required enum: **Task attempted**, **Steps taken**,
+   **Expected vs actual**, **Severity rating**, **Workaround used**,
+   **Actionable suggestion**. The §10 template omits **severity rating** and
+   **workaround used**, so entries written to it are scored against an incomplete
+   schema. Rules §11.4 makes the Rules controlling over the architecture document, so the
+   six-field shape wins.
 
 2. **Group by category.** Use the five headings from `prd.md` §12: `## Ring API`,
    `## Vega SDK`, `## Bedrock`, `## AWS Setup`, `## Documentation Gaps`. Add a

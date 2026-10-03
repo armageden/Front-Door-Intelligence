@@ -17,7 +17,7 @@ From `src/lib/ringClient.ts`:
 | `createRingClient(options)` | factory | Returns the client. `options` takes injected `fetchImpl`, `sleepImpl`, and `now`, so every test runs without a network or real time |
 | `getAccessToken()` | method | Cached bearer token, refreshed inside the skew window |
 | `refreshAccessToken()` | method | Force a `refresh_token` grant |
-| `getDevice(deviceId)` | method | `GET /v1/devices/{id}` — the only source of a device name |
+| `getDevice(deviceId)` | method | `GET /v1/devices/{id}` — the only source of a device name. **Called** since the device-name phase, by the describe stage — D031 |
 | `fetchSnapshot(deviceId, snapshot)` | method | The two-request image flow |
 | `invalidateToken()` | method | Test seam; drops the cached token |
 | `RingApiError` | error class | Carries `statusCode` and a truncated `body` |

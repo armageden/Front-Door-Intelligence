@@ -4,13 +4,13 @@
 
 # Pipeline components
 
-Source: `ARCHITECTURE.md` §3.1–§3.4, §4.2, §3.6 and §3.7. **Four of the six planned
-functions are now implemented** — §3.1, §3.2, §3.4, and the §4.2 query — and documented
-from code in
-[06-handlers](../06-handlers/00-overview.md). This page still records the
-*specification* for each, which is why the component sections below are unchanged. The
-file layout the remaining functions will occupy is in
-[04-planned-structure](../03-repository/04-planned-structure.md).
+Source: `ARCHITECTURE.md` §3.1–§3.4, §4.2, §3.6 and §3.7. **Five of the six planned
+functions are now implemented** — §3.1, §3.2, §3.4, §3.6, and the §4.2 query — and
+documented from code in
+[06-handlers](../06-handlers/00-overview.md). Every `src/` file the specification asks for
+now exists; the Fire TV app and the web dashboard do not. This page still records the
+*specification* for each, which is why the component sections below are unchanged except
+where a decision made the build diverge.
 
 | § | Component | Status |
 |---|---|---|
@@ -19,7 +19,7 @@ file layout the remaining functions will occupy is in
 | §3.3 | Bedrock describer | folded into §3.2 — decision D018 |
 | §3.4 | Overlay pusher | **implemented, delivery only** — `src/handlers/overlayPusher.ts`; the picture-in-picture is not implementable, D021 |
 | §4.2 | Event query | **implemented** — `src/handlers/eventQuery.ts`; the spec named no auth, so one was added, D022 |
-| §3.6 | Daily summary | not written |
+| §3.6 | Daily summary | **implemented, without SES** — `src/handlers/dailySummary.ts`; the prompt gained three clauses, D026 |
 | §3.7 | Cross-track adapters | no file in the planned tree |
 
 §3.5, the DynamoDB event store, is documented separately in
@@ -105,6 +105,16 @@ Bedrock prompt, quoted from `ARCHITECTURE.md` §3.6:
 
 > Summarize today's front door activity in 2-3 sentences for a homeowner. Include:
 > number of events, types (deliveries, visitors, vehicles), and any notable patterns.
+
+**Three clauses were appended to that prompt and the token budget raised from 80 to 400**,
+both recorded as D026. The output row is also specified as "a `summary` item" without a
+key; the constant sort key it uses, and why that makes the daily write idempotent, is in
+[04-data-store](./04-data-store.md).
+
+The SES email is **not implemented**. It needs a verified identity, a destination, and an
+unsubscribe path, none of which this specification names — and the summary is readable
+through `GET /events/today` regardless. See
+[05-daily-summary](../06-handlers/05-daily-summary.md).
 
 ## 3.7 Optional cross-track adapters
 
