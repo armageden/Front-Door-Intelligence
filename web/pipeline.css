@@ -1,0 +1,224 @@
+/*
+ * The pipeline demo's own styles. app.css is loaded too, and owns the dashboard's look; this
+ * file adds the two things app.css has no opinion about: a stage strip, and the page
+ * furniture around two panes.
+ */
+
+.pipeline-page main {
+  max-width: 68rem;
+  margin: 0 auto;
+  padding: 1rem 1rem 3rem;
+}
+
+.lede {
+  color: var(--muted);
+  max-width: 52rem;
+}
+
+.lede em {
+  color: var(--accent);
+  font-style: normal;
+}
+
+/* --- the stage strip ------------------------------------------------------ */
+
+.stage-bar {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.stage-bar #replay {
+  flex: 0 0 auto;
+  font: inherit;
+  font-size: 0.8rem;
+  padding: 0.5rem 0.9rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--muted);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.stage-bar #replay:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.stages {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 0.5rem;
+  list-style: none;
+  margin: 1.5rem 0;
+  padding: 0;
+}
+
+.stage {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  padding: 0.6rem 0.7rem;
+  /* Dim until its stage runs. Opacity rather than colour alone, so the state is not
+     signalled by hue. */
+  opacity: 0.4;
+  transition: opacity 220ms ease, border-color 220ms ease;
+}
+
+.stage strong {
+  display: block;
+  font-size: 0.85rem;
+  margin-bottom: 0.2rem;
+}
+
+.stage span {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--muted);
+  line-height: 1.35;
+}
+
+.stage--done {
+  opacity: 1;
+  border-color: var(--accent);
+}
+
+.stage--done strong {
+  color: var(--accent);
+}
+
+/*
+ * Arrival cue.
+ *
+ * Both panes are dark and the new content is small, so a card landing on the television is
+ * easy to miss from across a desk. A one-shot border pulse says "that just happened" without
+ * touching the overlay's own rendering — which this page has a strong interest in leaving
+ * exactly as it is.
+ */
+.just-arrived {
+  animation: arrive 900ms ease-out;
+}
+
+@keyframes arrive {
+  0% {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px rgb(127 209 193 / 35%);
+  }
+  100% {
+    border-color: var(--line);
+    box-shadow: 0 0 0 0 rgb(127 209 193 / 0%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* The pulse is decoration. Someone who has asked for less motion gets the content
+     without it rather than an animation they did not ask for. */
+  .just-arrived {
+    animation: none;
+  }
+
+  .stage {
+    transition: none;
+  }
+}
+
+/* --- the two surfaces ----------------------------------------------------- */
+
+.surfaces {
+  display: grid;
+  /* The television gets more room than the dashboard, not less: it is the product's
+     centrepiece and the pane that suffers most when squeezed. */
+  grid-template-columns: 1.35fr 1fr;
+  gap: 1rem;
+  align-items: start;
+}
+
+.surface {
+  /* min-width: 0 so a wide child cannot inflate the track; grid items default to
+     min-content, which is how the fixed-width television blew the layout out. */
+  min-width: 0;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+  padding: 0.75rem 1rem 1rem;
+}
+
+.surface h2 {
+  margin-top: 0;
+}
+
+.surface--tv {
+  /* Stands in for a television: dark and letterboxed. No min-height — an earlier value of
+     22rem left the pane mostly void whenever the two surfaces stacked, which read as a
+     loading state rather than as an idle television. */
+  background: #05070a;
+  padding-bottom: 1.5rem;
+}
+
+/*
+ * The television is laid out at a real screen's size and then scaled to fit.
+ *
+ * The overlay client's CSS is sized for a television — a 2rem description inside 46rem of card
+ * with 2rem of padding. Squeezing that into a side pane does not render it smaller, it makes
+ * the browser REFLOW it: the sentence wrapped to one word per line, the card grew taller than
+ * its container, and it spilled over the stage strip above it. (Seen in a browser, not
+ * predicted — this is Friction Log Entry 24.)
+ *
+ * So the overlay keeps its own layout at 1280x720 and is scaled to whatever the pane is.
+ * That is what embedding a TV UI in a web page actually means, and it means the pane shows
+ * the SAME rendering a television would — which is the entire claim of this demo. The scale
+ * factor is set by fitOverlay() in pipeline.ts and written to --tv-fit.
+ */
+.tv-screen {
+  aspect-ratio: 16 / 9;
+  width: 100%;
+  overflow: hidden;
+  /* position: relative so the absolutely-positioned screen below is contained here rather
+     than escaping to the page. */
+  position: relative;
+}
+
+/*
+ * Absolute, not in flow. A 1280px-wide child inside a flex or grid item makes the item's
+ * min-content width 1280px, which inflated the whole page to 1088px in an 800px viewport and
+ * pushed the last pipeline stage off-screen. Absolutely positioned, it contributes nothing
+ * to its parent's size and is clipped to the pane instead.
+ */
+.tv-screen > #overlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 1280px;
+  height: 720px;
+  transform: translate(-50%, -50%) scale(var(--tv-fit, 0.25));
+  transform-origin: center center;
+}
+
+.dashboard-pane {
+  max-height: 34rem;
+  overflow-y: auto;
+}
+
+/* The dashboard's own h1 is this page's h1; inside the pane it is redundant. */
+.dashboard-pane > h1 {
+  display: none;
+}
+
+.dashboard-pane h2 {
+  margin-top: 0.75rem;
+}
+
+/* Stack much later than before. The whole premise of this page is that both screens are
+   visible at the same time; stacking at 46rem meant a 900px laptop — which judges use —
+   lost the one thing the page exists to show. */
+@media (max-width: 34rem) {
+  .stages {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .surfaces {
+    grid-template-columns: 1fr;
+  }
+}

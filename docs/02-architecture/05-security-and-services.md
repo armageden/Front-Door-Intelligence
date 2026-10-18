@@ -51,6 +51,24 @@ asks for free-tier discipline; the default threshold of $10/month is well inside
 **Not verified:** no account and no SAM CLI, so the budget has never been created and no
 notification has ever been sent.
 
+## CORS is a security control here, not a convenience
+
+`GET /events/today` returns a homeowner's door activity. `DashboardAllowedOrigins` is a
+`CommaDelimitedList` parameter rather than a hard-coded `*` for exactly that reason: **the set
+of pages permitted to read it belongs to the deployer.** The default is `*` so a demo works on
+first deploy with no configuration, and the parameter's description says what to narrow it to
+once the Pages URL is known.
+
+`AllowCredentials` is deliberately absent. The key travels in a header, never a cookie, so
+there is nothing to send and adding it would only restrict the wildcard case.
+
+The snapshot bucket carries a matching `GET`/`HEAD` rule for the cross-origin image fetch. That
+one is lower severity — an `<img>` paints without it — but any future canvas read would fail.
+No CORS rule was declared on either resource before 2026-10-04, which would have made the live
+dashboard unusable; that omission is Friction Log Entry 22 and decision D037.
+
+The WebSocket API needs no CORS. The overlay client is not subject to the preflight rule.
+
 **The daily summary's role is read-and-write, and narrower than every other stage.** It
 gets `dynamodb:Query` and `dynamodb:PutItem` on the events table and nothing else — no
 `UpdateItem`, no `DeleteItem`, no `Scan`. A compromised summary job can therefore write one
@@ -66,7 +84,7 @@ was true when written and was retired by the tooling phase. See
 
 | Service | Purpose | Mini-challenge |
 |---|---|---|
-| API Gateway (HTTP API) | Webhook ingress and REST endpoints | — |
+| API Gateway (HTTP API) | Webhook ingress, REST endpoints, and the dashboard's CORS policy | — |
 | Lambda | All compute. Six functions in the plan, five handler files, **seven functions in `template.yaml`** — `bedrockDescriber` was folded into the describe stage by D018, and `$connect` / `$disconnect` are separate functions on the same source file | — |
 | DynamoDB | Event store and idempotency | — |
 | Amazon Bedrock | AI description generation | AWS Builder |

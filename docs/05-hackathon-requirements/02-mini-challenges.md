@@ -44,10 +44,10 @@ fresh repo built for a *different* hackathon during this window would be eligibl
 **"Yes that's fine!"** No theme match, no merging, no maintainer relationship.
 
 `prd.md` §13 says "Open Source mini-challenge: repo is public + MIT licensed" and
-`ARCHITECTURE.md` §14 says "MIT-licensed public repo with complete setup
-instructions". Read against the rules, **that is the submission repo claiming to be
-its own contribution, and the prize is $5,000.** The fix is a second, small, genuinely
-separate licensed repo or a real PR — hours, not days.
+`ARCHITECTURE.md` §14 (corrected 2026-10-16) says "Separate licensed repository alongside the
+submission — the form asks for two distinct URLs". Read against the rules, **that is the
+submission repo claiming to be its own contribution, and the prize is $5,000.** The fix is a
+second, small, genuinely separate licensed repo or a real PR — hours, not days. **Still open.**
 
 ### Hacktoberfest is a red herring
 

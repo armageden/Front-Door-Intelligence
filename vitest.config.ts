@@ -18,7 +18,7 @@ export default defineConfig({
       // src/types/ is types only — it emits no executable code, so including it
       // reports a misleading 0% that looks like a gap and is not one.
       exclude: ['src/types/**'],
-      reporter: ['text-summary', 'json-summary'],
+      reporter: ['text-summary', 'json-summary', 'json'],
       reportsDirectory: 'coverage',
     },
   },

@@ -1,6 +1,6 @@
 **Back:** [00-overview](./00-overview.md)
 
-**Verified against:** Devpost Official Rules §1, §4, §6, §8, §11.4; the hackathon Overview page; the FAQs; Updates feed. All read 2026-09-28. Unresolved items are listed explicitly at the end.
+**Verified against:** Devpost Official Rules §1, §4, §6, §8, §11.4; the hackathon Overview page; the FAQs; Updates feed. All read 2026-09-28. **Re-verified against the live Rules and Overview page on 2026-10-16** — both return 403 to plain automated requests and were read through a rendering proxy. That pass confirmed every quotation below against the current source, resolved the Sept 16 banner and the credit-form questions, and corrected one mis-sourced attribution (the plural "track(s)" appears in the Overview submission requirements, not in §4 as previously recorded).
 
 # Official requirements
 
@@ -65,10 +65,13 @@ Neither `prd.md` nor `ARCHITECTURE.md` mentions it.
 4. **Quality of the Idea** — creative use of the tools; genuine understanding of the
    developer ecosystem and end-user needs
 
-The project's `ARCHITECTURE.md` §14 lists Innovation, Impact, Tech Implementation,
-Design, Presentation. **"Innovation" and "Presentation" are not criteria** and
-"Quality of the Idea" is missing. A document called "Judging Alignment" that names
-the wrong criteria will misdirect every prioritisation decision made against it.
+`ARCHITECTURE.md` §14 **used to** list Innovation, Impact, Tech Implementation, Design,
+Presentation. **"Innovation" and "Presentation" are not criteria** and "Quality of the Idea"
+was missing. A document called "Judging Alignment" that names the wrong criteria misdirects
+every prioritisation decision made against it.
+
+**Corrected 2026-10-16.** §14 now leads with the Stage One pass/fail gate and then the four
+real criteria. See [03-doc-conflicts](./03-doc-conflicts.md) conflict 3.
 
 Track-specific "Obvious vs Creative" guidance matters here, because the rubric draws
 that line explicitly:
@@ -124,14 +127,17 @@ be provided. GitLab is not accepted — the rules require GitHub specifically.
 
 ## Private repos are allowed
 
-`prd.md` §10 says "Public repo: Mandatory; private repos are not judgeable." That is
-**false** — Rules §4 permits private repos shared with Devpost and the Amazon team.
+`prd.md` §10 **used to** say "Public repo: Mandatory; private repos are not judgeable." That
+is **false** — Rules §4 permits private repos shared with Devpost and the Amazon team.
+**Corrected 2026-10-16**; see [03-doc-conflicts](./03-doc-conflicts.md) conflict 4.
 
 Keep the plan to publish publicly anyway, but for the right reason. The FAQ warns
-that reviewer **invitations expire after 7 days**, so add
-`testing@devpost.com` and the named Amazon reviewers **around the time you submit**,
-not weeks in advance. Public is simpler and matches the Open Source mini-challenge, so
-it stays the recommendation.
+that reviewer **invitations expire after 7 days**, so add `testing@devpost.com` and the
+named Amazon reviewers **around the time you submit**, not weeks in advance. The Overview
+page lists the reviewers as the GitHub handles `chris-trag`, `knmeiss`, `giolaq`,
+`anishamalde`, `mosesroth`, and `emersonsklar` (page read 2026-10-19 through a rendering
+proxy). Public is simpler and matches the Open Source mini-challenge, so it stays the
+recommendation.
 
 ## Multiple submissions
 
@@ -151,8 +157,8 @@ device." The project's `prd.md` constraint that no device is needed is **correct
 | Item | Status |
 |---|---|
 | Whether the **primary submission repo** itself satisfies the Open Source mini-challenge | **NOT FOUND.** Rules say "additional… alongside" and require two URLs, but no source addresses this case directly. Do not bet on it |
-| Which of the **three** AWS credit form URLs is live | **NOT FOUND.** Rules §4, Resources, and the FAQ each link a different form. Use the Rules-page link and submit well before Oct 21 |
-| Body text of a **September 16, 2026 rules banner** about repository requirements | **NOT FOUND.** Present as a banner, absent from the Updates feed. Its substance appears absorbed into current Rules §4 |
+| Which of the **three** AWS credit form URLs is live | **RESOLVED 2026-10-16.** Moot: the credit pool is exhausted. Every candidate resolves to a notice reading *"we've run out of AWS credits to distribute for this hackathon and [are] no longer able to accept any credit requests."* No credit is obtainable, so the URL no longer matters. The Oct 21 deadline is moot with it. **The $15K and $5K credits in the prize table are unaffected** — those are prize components paid to a winner, never routed through this form. |
+| Body text of a **September 16, 2026 rules banner** about repository requirements | **RESOLVED 2026-10-16.** The banner exists and reads only *"September 16, 2026 UPDATE: Hackathon submission requirements: Code repository."* — a **heading with no body**. The substance it announces is the ordinary §4 code-repository requirement, which is quoted in full in the submission table above. Nothing is missing; the banner is simply a pointer. |
 
 ## Related
 

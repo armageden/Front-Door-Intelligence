@@ -2,7 +2,7 @@
   "name": "front-door-intelligence",
   "version": "0.1.0",
   "private": true,
-  "description": "Amazon Developer Hackathon 2026 (Ring track) — turn front-door motion events into one-sentence AI descriptions on a Fire TV overlay.",
+  "description": "Amazon Developer Hackathon 2026 (Ring track) \u2014 turn front-door motion events into one-sentence AI descriptions on a Fire TV overlay.",
   "license": "MIT",
   "engines": {
     "node": ">=20"
@@ -10,7 +10,7 @@
   "scripts": {
     "docs:check": "node scripts/docs-check.mjs",
     "typecheck": "tsc --noEmit && npm run typecheck:web && npm run typecheck:firetv",
-    "typecheck:web": "tsc --noEmit -p web/tsconfig.json",
+    "typecheck:web": "tsc --noEmit -p web/tsconfig.json && npm run typecheck:pipeline",
     "typecheck:firetv": "tsc --noEmit -p firetv/tsconfig.json",
     "build": "node scripts/build-lambda.mjs",
     "build:web": "node scripts/build-web.mjs",
@@ -19,7 +19,9 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "build:verify": "node scripts/verify-bundle.mjs",
-    "all": "npm run typecheck && npm test && npm run build && npm run build:verify && npm run build:web && npm run build:firetv && npm run docs:check"
+    "all": "npm run typecheck && npm test && npm run build && npm run build:verify && npm run build:web && npm run build:firetv && npm run docs:check",
+    "typecheck:pipeline": "tsc --noEmit -p web/tsconfig.pipeline.json",
+    "coverage:gaps": "node scripts/coverage-gaps.mjs"
   },
   "devDependencies": {
     "@types/aws-lambda": "^8.10.163",

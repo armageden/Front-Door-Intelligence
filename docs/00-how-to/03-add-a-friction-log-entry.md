@@ -1,28 +1,30 @@
 **Back:** [00-overview](./00-overview.md)
 
-**Verified against:** `ARCHITECTURE.md` §10, §14 and §15, and `prd.md` §9, §12 and §13, read directly. The `FRICTION_LOG.md` template is quoted from `ARCHITECTURE.md` §10; the file itself does not exist yet.
+**Verified against:** `ARCHITECTURE.md` §10 and §14, and `prd.md` §9, §12 and §13, read directly. `ARCHITECTURE.md` §10 now carries the six-field template the Rules require. `FRICTION_LOG.md` exists in the repo root with 27 entries; the entries were read for tone and specificity.
 
 
 # Recipe: add a friction log entry
 
-**Goal:** record a tooling problem that cost time, in the format that earns the 10%
-judging bonus.
+**Goal:** record a tooling problem that cost time, in the format the Rules require for the
+recommended 10% judging bonus.
 
 ## Why this is not optional
 
-FR18 makes the Friction Log a MUST, and `ARCHITECTURE.md` §10 states it is worth up to
-a 10% bonus on the final judging score. `prd.md` §9 sets the target at **more than 10
-specific, actionable items**. `prd.md` §12 lists the five categories to cover: Ring API,
-Vega SDK, Bedrock, AWS setup, and documentation gaps.
+FR18 makes the Friction Log a MUST, and `ARCHITECTURE.md` §10 records that it is **recommended**
+for up to a 10% bonus. Per Rules §6 the bonus is not automatic: Amazon's internal review team
+assesses the entries during **Stage 1 downselection** and passes a *recommended* bonus to the
+Stage 2 panel, which applies it to the final spreadsheet score. `prd.md` §9 sets the target at
+**more than 10 specific, actionable items**. `prd.md` §12 lists the five categories to cover:
+Ring API, Vega SDK, Bedrock, AWS setup, and documentation gaps.
 
-The file does not exist in the working tree — see
-[01-current-state](../03-repository/01-current-state.md). Creating it is this recipe's
-first step, and it is the single highest-leverage thing you can add to the repo today.
+`FRICTION_LOG.md` already exists with **27 entries** across all five categories, so this recipe
+is about adding the next one rather than creating the file. Read the existing entries first —
+the bar is a specific, falsifiable obstacle with a named workaround, not a complaint.
 
 ## Steps
 
 1. **Create the file at the repo root** in the six-field shape the Rules require.
-   `FRICTION_LOG.md` now exists and holds 20 entries, so read it for tone and specificity
+   `FRICTION_LOG.md` now exists and holds 27 entries, so read it for tone and specificity
    before adding to it:
 
    ```markdown

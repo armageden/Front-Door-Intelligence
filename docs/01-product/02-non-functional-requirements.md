@@ -18,7 +18,7 @@ Source: `prd.md` §6 (NFR1–NFR7), §9 (success metrics), §10 (constraints).
 | NFR4 | The public GitHub repository MUST include an MIT License visible in the About section | `LICENSE` at repo root | **Implemented** — MIT `LICENSE` at the repo root, matching the manifest's `"license": "MIT"` |
 | NFR5 | The README MUST include complete setup instructions so judges can run the project locally | `README.md` | **Implemented** — `README.md` carries setup, the env template, deploy steps, every command, and an explicit statement that nothing has run against live AWS |
 | NFR6 | The demo video MUST be under 3 minutes, leading with the user problem before the solution | External deliverable | Not implemented — nothing to record yet |
-| NFR7 | Total AWS resource usage SHOULD stay within free-tier limits where feasible | Model choice, max tokens | **Partly** — `MAX_TOKENS = 80` and `TEMPERATURE = 0.2` are in place; the CloudWatch billing alarm that would *detect* a runaway does not |
+| NFR7 | Total AWS resource usage SHOULD stay within free-tier limits where feasible | Model choice, max tokens | **Implemented** — `MAX_TOKENS = 80` and `TEMPERATURE = 0.2` are in place, and `CostAlarmBedrockBudget` detects a runaway. §6 named a CloudWatch alarm; D027 records why an AWS Budget replaces it. Never created: no AWS account |
 
 NFR1 and NFR2 are the two that shape the code most: they force the webhook handler to
 acknowledge fast and to be idempotent, which is why the design makes the webhook
@@ -53,8 +53,8 @@ webhook must answer inside 5s (NFR1) and the whole pipeline must finish inside 8
 | Time | ~26 days to deadline, 24 October 2026 |
 | Solo developer | No team; must prioritise ruthlessly |
 | Ring physical device | Not required; simulators acceptable |
-| Public repo | Mandatory; private repos are not judgeable |
-| Vega OS testing | Requires a physical Fire TV Stick running Vega OS, or a virtual device |
+| Public repo | Publishing publicly is the plan. Rules §4 permits a private repo shared with `testing@devpost.com` and the Amazon team — private repos are judgeable. Public is chosen because it also serves the Open Source mini-challenge |
+| Vega OS testing | An emulator or simulator is sufficient at every stage of submission and judging; a physical Fire TV Stick is **not** required (FAQs) |
 
 The deadline and timeline live in `prd.md` §10 and `ARCHITECTURE.md` §13. The README and
 the MIT `LICENSE` required by NFR4 and NFR5 now both exist. See

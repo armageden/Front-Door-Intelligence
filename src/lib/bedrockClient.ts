@@ -11,13 +11,29 @@
  * `anthropic.claude-3-haiku` or `amazon.nova-lite-v1`; **max tokens 80**;
  * **temperature 0.2**; and the system prompt text, which this module uses as its base.
  *
- * **Not verified in this session:** the exact Bedrock request envelope. The shape used
- * here is the standard Claude-on-Bedrock `InvokeModel` form — an `anthropic_version`
- * field, `max_tokens`, `temperature`, and a `messages` array carrying one image block
- * and one text block. No AWS documentation was fetched while writing this, so treat the
- * envelope as a well-founded default rather than a confirmed one. It is the single most
- * likely thing to need adjusting on first real invocation, and the failure would be
- * loud (an API error), not silent.
+ * ## The envelope is now verified against the AWS documentation
+ *
+ * **Fetched and checked 2026-10-04** against the Bedrock reference pages for the
+ * Anthropic Claude Messages API. Confirmed correct:
+ *
+ * - `anthropic_version` must be exactly `bedrock-2023-05-31`, and `max_tokens` and
+ *   `messages` are the two other **required** fields — all three are present.
+ * - The image block shape is verbatim from the docs' own multimodal example:
+ *   `{ type: "image", source: { type: "base64", media_type: "image/jpeg", data } }`.
+ * - `system` is a valid optional field, and the response's text lives at
+ *   `content[].text` where `extractText` looks first.
+ *
+ * **This verification found a real defect, which is why it was worth doing.** The docs
+ * state that `stop_reason` is `max_tokens` when the generated text hit the token ceiling
+ * — and in that case the `content` array **still contains text**. The original parser
+ * returned it, so a description truncated mid-word would have been stored as a complete
+ * sentence and marked `ai`. `extractText` now rejects that case and falls back to FR11's
+ * deterministic sentence, which is worse-looking and honest. It also distinguishes a
+ * content-classifier `refusal` (empty `content`) from a transport failure.
+ *
+ * **Still not verified:** that a real `InvokeModel` call returns this, in an account with
+ * model access. No AWS account exists here. What is now confirmed is the *shape*; the
+ * remaining risk is access and quota, not the envelope.
  *
  * ## The watermark, and why the prompt has an extra sentence
  *
@@ -45,7 +61,12 @@ export const MAX_TOKENS = 80;
 /** `ARCHITECTURE.md` §3.3. */
 export const TEMPERATURE = 0.2;
 
-/** The Anthropic-on-Bedrock API version field. Not verified in this session. */
+/**
+ * The Anthropic-on-Bedrock API version field.
+ *
+ * Verified 2026-10-04: the AWS reference states the value "must be bedrock-2023-05-31",
+ * which is what makes this a constant rather than a parameter.
+ */
 export const ANTHROPIC_VERSION = 'bedrock-2023-05-31';
 
 /**
@@ -200,6 +221,8 @@ function extractText(body: Uint8Array, modelId: string): string {
     // Nova and other models on Bedrock answer in a different shape.
     output?: { message?: string } | string;
     results?: { outputText?: string }[];
+    // Verified against the Bedrock Claude request/response reference, 2026-10-04.
+    stop_reason?: string;
   };
   try {
     parsed = JSON.parse(new TextDecoder().decode(body)) as typeof parsed;
@@ -208,7 +231,16 @@ function extractText(body: Uint8Array, modelId: string): string {
   }
 
   const anthropic = parsed.content?.find((block) => block.type === 'text')?.text;
-  if (typeof anthropic === 'string' && anthropic.trim().length > 0) return anthropic.trim();
+  if (typeof anthropic === 'string' && anthropic.trim().length > 0) {
+    // A response cut off by the token budget still carries text, and returning it here
+    // would store a sentence that stops mid-word as if the model had finished it. §3.3's
+    // contract is one sentence, and a half-sentence presented as a whole one is worse than
+    // the deterministic fallback it replaces.
+    if (parsed.stop_reason === 'max_tokens') {
+      throw new BedrockError(modelId, new Error('response was truncated at max_tokens'));
+    }
+    return anthropic.trim();
+  }
 
   // Fallbacks for non-Anthropic models on the same Bedrock endpoint, so a model swap
   // does not require a code change.
@@ -217,6 +249,13 @@ function extractText(body: Uint8Array, modelId: string): string {
 
   const other = parsed.results?.[0]?.outputText;
   if (typeof other === 'string' && other.trim().length > 0) return other.trim();
+
+  // An empty `content` array with stop_reason `refusal` is a content-classifier block, not
+  // a transport failure. It is named distinctly so the reason reaches the logs; both end in
+  // FR11's fallback, but they are not the same event.
+  if (parsed.stop_reason === 'refusal') {
+    throw new BedrockError(modelId, new Error('request was refused by the content classifier'));
+  }
 
   throw new BedrockError(modelId, new Error('response contained no extractable text'));
 }

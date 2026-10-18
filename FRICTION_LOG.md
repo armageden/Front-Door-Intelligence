@@ -1,8 +1,8 @@
 # Friction Log — Front Door Intelligence
 
-Amazon Developer Hackathon 2026, Ring track. Every entry below is a real obstacle hit
+Amazon Developer Hackathon 2026, Ring and Fire TV tracks. Every entry below is a real obstacle hit
 while building this repository, with the decision or code that resolved it. Entries cite
-the project's own decision log (`docs/02-architecture/06-design-decisions.md`, D001–D023)
+the project's own decision log (`docs/02-architecture/06-design-decisions.md`, D001–D041)
 and research notes, so each one is checkable rather than reconstructed from memory.
 
 **Entry format.** The Official Rules §6 define a six-field enum for friction entries:
@@ -86,7 +86,7 @@ code comment.
   runs against fakes, and a green suite is not evidence the system works against Ring.
 - **Workaround used:** Dependency injection at every seam — the Ring client, the document
   client, the S3 presigner, the queue send, and the API Gateway poster are all injectable,
-  so 172 tests cover real logic with no network. Request shapes are verified against
+  so 483 tests cover real logic with no network. Request shapes are verified against
   documentation, never against observed traffic, and every document says so. A free Ring
   account may open the token and device-lookup paths (see the Resources notes in
   `docs/05-hackathon-requirements/06-hackathon-resources.md`).
@@ -153,14 +153,15 @@ code comment.
     LONG duration, so it **cannot express FR14's 15-second auto-dismiss**.
   - Focus selection **ignores z-order**, so FR13's dismiss button is unreachable by D-pad
     navigation over a content grid.
-- **Severity rating:** **High.** Two MUST requirements are not implementable as written,
-  and the failure is silent — the view renders, just underneath.
+- **Severity rating:** **High.** Two MUST requirements were not implementable as written
+  at the time (FR12 and FR14; FR14 was later implemented — D034), and the failure is
+  silent — the view renders, just underneath.
 - **Workaround used:** Built the delivery half only: the §3.4 payload, per-connection
   fan-out, and the connection registry, all of which are implementable and track-independent.
   What a Fire TV app **can** do with this payload today is genuinely useful — fetch
   `snapshot_url`, show the sentence as a toast, and trigger a content-launch deep link.
-  Decision D021 records the platform limit. FR12 and FR14 are recorded as *not
-  implementable as written* rather than as unfinished work.
+  Decision D021 records the platform limit. FR12 is recorded as *not implementable as
+  written* rather than as unfinished work; FR14 was retired from that list by D034.
 - **Actionable suggestion:** The Fire TV track's **Fire OS** option is the lead here — it
   has documented heads-up notifications that float over content, which Vega does not. A
   platform-agnostic overlay API (or documented PiP on Vega) would let the PRD's own design
@@ -205,6 +206,57 @@ code comment.
   connection pruning with self-healing — since batch-abort is the obvious default.
 
 ---
+
+### Entry 24: The pipeline demo mounted the overlay under the wrong element id and lost all of its CSS
+
+- **Task attempted:** Build a third demo showing the whole chain on one page — the real
+  Fire TV overlay client beside the real dashboard.
+- **Steps taken:** Mounted the overlay into `<div id="tv">` inside a constrained pane, then
+  opened the built page in a browser.
+- **Expected vs actual:** Expected a scaled-down television beside the timeline. **The
+  overlay rendered unstyled and burst out of its pane**, wrapping the sentence to one word per
+  line and spilling over the pipeline stage strip. Two separate causes, neither of which any
+  test could see. First, `firetv/overlay.css` keys its entire layout on `#overlay` — centring,
+  padding, column flow — so a differently-named mount point silently loses all of it. Second,
+  once found, the overlay is sized for a television (a 2rem description in a 46rem card), and
+  squeezing that into a side pane makes the browser **reflow** it rather than shrink it.
+- **Severity rating:** **Medium.** Presentation only, and it would have been the first thing a
+  judge saw on the page the landing page points at.
+- **Workaround used:** The pane is now `<main id="overlay">`, matching the overlay's own page
+  exactly, and the television lays out at a real 1280x720 and is scaled to fit with a
+  `transform` — which means the pane shows the same rendering a television would, rather than a
+  reflowed one. The fixed-width screen is absolutely positioned so it cannot inflate the grid,
+  and `min-width: 0` stops the surfaces doing it again.
+- **Actionable suggestion:** **Component CSS keyed on a hard-coded id is a coupling that no
+  type system sees.** A consumer that mounts a component under a different element name gets
+  no error and no layout. A class-based root, or the component exporting its own required id,
+  turns a silent visual failure into a compile error.
+
+### Entry 25: A tsconfig inherited the exclusion meant to keep it out, so it typechecked nothing and reported success
+
+- **Task attempted:** Let one file legitimately import across two source trees, by giving it
+  its own tsconfig.
+- **Steps taken:** Added `web/tsconfig.pipeline.json` with `extends: "./tsconfig.json"` and a
+  `include` naming the files it was meant to check. It did not set `exclude`.
+- **Expected vs actual:** Expected a second pass covering those files. **It covered none of
+  them.** An extending config inherits `exclude` from what it extends, and the base config
+  excluded `src/pipeline.ts` precisely because the base config cannot contain a
+  cross-tree import. So the pipeline config inherited an exclusion of exactly the files it
+  existed to check. `npm run typecheck` passed the whole time, printing a clean run of an
+  empty program.
+- **Severity rating:** **High**, because of the shape of it rather than the size. A typecheck
+  that checks nothing is worse than no typecheck: it is a green light wired to a lamp with
+  nothing behind it. It concealed a real compile error (`cycle(id, wait)` — a leftover from
+  renaming a parameter) that had been breaking the demo page silently in a browser while
+  every gate stayed green.
+- **Workaround used:** `web/tsconfig.pipeline.json` now sets `"exclude": []` explicitly, with
+  a note saying why. The type error surfaced immediately. The demo's control flow was also
+  pulled out into a pure `runLoop()` so this class of wiring is covered by tests rather than
+  by a browser.
+- **Actionable suggestion:** **`extends` inherits `exclude` as well as `include`, and nothing
+  tells you when the result is empty.** Verify any new project with
+  `tsc --listFiles | grep <yourfile>` once, when you create it — a config that includes nothing
+  is indistinguishable from one that passes.
 
 ## Bedrock
 
@@ -457,18 +509,139 @@ code comment.
   rule section in the template itself so the conflict is visible at the point of use rather
   than discovered at submission.
 
----
+### Entry 21: The demo's own fixtures hid a broken first impression, and no test could have seen it
 
-## Summary
+- **Task attempted:** Make the two fixture demos presentable to judges.
+- **Steps taken:** Ran both built demo pages in a real browser rather than trusting the unit
+  tests that already covered the code feeding them, and looked at what actually painted.
+- **Expected vs actual:** Expected a populated page on load. Two defects appeared that no
+  test in the repository could have caught. **The overlay opened on "Waiting for the front
+  door…" and stayed there for eight seconds** — `demoSocketFactory` used `setInterval`
+  alone, so the first fixture landed one full interval after load, and the demo's worst moment
+  was an apparently broken page. **The dashboard's snapshot placeholders were invisible**:
+  the SVG background was `#181d27`, which is exactly the card background, so each frame
+  rendered as an empty box with a thin artefact in it and read as a broken image.
+- **Severity rating:** **Medium.** Both are presentation-only, and neither affects the
+  pipeline — but these are the two pages a judge opens first, and "broken" is the one
+  impression a demo cannot afford.
+- **Workaround used:** The socket now emits its first fixture immediately and only then
+  starts the interval; the placeholder background moved to `#0d1016` with a visible border in
+  both demos. Both were confirmed by reloading the pages in the browser, not by reasoning.
+- **Actionable suggestion:** Fixture-driven demos need at least one check that renders the
+  real page. A unit test over the fixture data cannot distinguish "renders correctly" from
+  "renders as a blank box" — the background colour matching its container is not a property
+  any assertion here could see.
+
+### Entry 22: The browser client could never have reached the API, and every demo was green
+
+- **Task attempted:** Publish the two front ends as static demos and let the dashboard read
+  `GET /events/today`.
+- **Steps taken:** Set `CorsConfiguration` on the HTTP API and the snapshot bucket, then went
+  back over the template looking for other things the demos could not exercise.
+- **Expected vs actual:** Expected the live dashboard to work once pointed at a deployed
+  endpoint. **It would not have.** The API declared no CORS configuration at all; the
+  dashboard is served from GitHub Pages and fetches a different origin, and it sends
+  `X-Query-Key`, which is not a safelisted header, so the browser preflights — and the
+  preflight would have received no `Access-Control-Allow-Origin`.
+- **Severity rating:** **High**, and specifically because it is *undetectable from here*.
+  Every fixture demo is same-origin and never preflights, so all 326 tests, both rendered
+  pages, and anything a judge opens before a deployment would have been green while the live
+  path was broken. The next defect found the same way is the WebSocket route expression, which
+  routes nothing the pusher actually sends.
+- **Workaround used:** `CorsConfiguration` with a `DashboardAllowedOrigins` parameter rather
+  than a hard-coded `*`, because an origin allowlist on an endpoint returning a homeowner's
+  door activity is a security control the deployer should own. Recorded as decisions D037 and
+  D038.
+- **Actionable suggestion:** A browser client and a JSON API in the same repository need a
+  cross-origin check as part of the definition of done. Serverless templates ship without CORS
+  by default and nothing warns you.
+
+### Entry 23: The Bedrock response was parsed without reading the response schema
+
+- **Task attempted:** Confirm the Bedrock request envelope — the repository's own docs had
+  called it "the single most likely thing to need adjusting on first real invocation".
+- **Steps taken:** Fetched the Bedrock reference pages for the Anthropic Claude Messages API
+  and compared the documented request, the documented response, and the code.
+- **Expected vs actual:** Expected to confirm the envelope and find nothing wrong. The request
+  is correct — `anthropic_version`, `max_tokens`, `messages`, and the image block match the
+  documentation's own multimodal example verbatim. **The response handling was wrong.** The
+  docs state that `stop_reason` is `max_tokens` when generation hit the token ceiling, and
+  that the `content` array still contains text in that case. The parser returned that text,
+  so a description truncated mid-word would have been stored as a complete sentence and marked
+  as model-generated — on an event where §3.3 promises exactly one sentence.
+- **Severity rating:** **Medium.** It would not throw; it would quietly store a fragment and
+  report it as a success. It would surface as the AI describing an event slightly oddly, which
+  is close to undebuggable in a demo.
+- **Workaround used:** `extractText` now rejects `stop_reason: "max_tokens"` and falls back to
+  the deterministic sentence, which is plainer and honest. It also distinguishes a
+  content-classifier `refusal` (which returns an empty `content` array) from a transport
+  failure, since both previously produced the same generic error.
+- **Actionable suggestion:** Publish the response schema, not just the request schema. The
+  request is the half everyone checks and the response is the half that decides whether a
+  truncated answer is detected at all.
+
+### Entry 26: A test helper failed the whole suite while all 483 of its tests passed
+
+- **Task attempted:** Raise coverage, and stop the demo loop from outliving its test.
+- **Steps taken:** Gave `startPipeline` an injectable clock so a test could drive a looping
+  demo without waiting real seconds, and gave the fake DOM a `restore()` between tests.
+- **Expected vs actual:** Expected a clean run. **Every test passed and `npm test` still
+  exited 1.** The demo repaints with `void repaint()` — detached on purpose, because a repaint must
+  never reject the demo loop — so a render begun in one test resolved after the *next* test
+  had removed the global `document`. `load()` caught the resulting error and tried to render
+  its error state, which threw again. Vitest reported one unhandled rejection, attributed to
+  whichever test happened to run last and pointing at `web/src/app.ts`, which none of the
+  four named tests had touched.
+- **Severity rating:** **Medium.** A green tick list with a red exit code trains people to
+  ignore the exit code, which is how a real failure gets missed later.
+- **Workaround used:** One document installed for the whole test file rather than per test,
+  with the page body reset between tests. The document now outlives every individual test, so
+  a late repaint finds it. Draining microtasks before teardown is documented as best-effort
+  and is not relied on.
+- **Actionable suggestion:** **Detached promises outlive the test that started them.** If a
+  module keeps a loop, the test needs the loop stopped AND the environment it depends on
+  shared for the whole file — not a tidy per-test setup and teardown.
+
+### Entry 27: The AWS credit form still accepts a click and returns a refusal
+
+- **Task attempted:** Obtain AWS promotional credits through the hackathon's credit request
+  form, so the stack could be deployed and tested at least once before submission.
+- **Steps taken:** Followed the credit request form linked from the hackathon Resources page and
+  cross-checked it against Rules §4, which advertises an **Oct 21, 12:00pm PT** deadline for the
+  request — two days before submission closes.
+- **Expected vs actual:** Expected a live form. It resolves to a notice reading *"Unfortunately,
+  we've run out of AWS credits to distribute for this hackathon and no longer able to accept any
+  credit request."* The Rules carry a matching dated entry — **"October 7th Update: We are out of
+  credit codes and will no longer be accepting credit requests"** — but no banner or Updates post
+  announced it, and the Oct 21 deadline the Rules still advertise sits two weeks after the pool
+  closed. No request can be submitted at all, and the advertised deadline is moot.
+- **Severity rating:** **Medium.** Two costs. The Rules advertise a hard date that cannot be met,
+  so it stays on the critical path until someone opens the form. And the notice names neither the
+  amount lost nor its relationship to the prize table, so the natural reading is that the
+  **$15K** Fire TV and **$5K** mini-challenge credits are gone too — they are not; those are prize
+  components paid to a winner and were never routed through this form. Hours can be lost to a
+  prize calculation that is actually intact.
+- **Workaround used:** No workaround exists for the credits, because the pool is empty. Build and
+  test on free tier and tear resources down immediately afterwards, which is what the FAQ
+  recommends regardless: *"spin resources up only for testing and tear them down afterward."* The
+  question of which of the three linked form URLs was live — recorded as unresolved in
+  `docs/05-hackathon-requirements/01-official-requirements.md` — is now moot and is closed.
+- **Actionable suggestion:** When a promotional credit pool is exhausted, replace the request form
+  with a status notice on the hackathon site **and in the Updates feed**, and say explicitly that
+  the prize-table credits are unaffected. A form that accepts a click and returns a refusal is
+  worse than a dead link: it costs planning time, leaves a Rules deadline advertised with nothing
+  behind it, and invites entrants to write off prize value that is still live.
+
+---
 
 | Category | Entries |
 |---|---|
 | Ring API | 5 |
-| Vega SDK / Fire TV | 3 |
+| Vega SDK / Fire TV | 5 |
 | Bedrock | 3 |
 | AWS Setup | 4 |
-| Documentation Gaps | 5 |
-| **Total** | **20** |
+| Documentation Gaps | 10 |
+| **Total** | **27** |
 
 `prd.md` §9 targets **more than 10** specific, actionable items. The two unverified items
 most worth reporting upstream are **Entry 3** (no webhook sandbox) and **Entry 6** (no

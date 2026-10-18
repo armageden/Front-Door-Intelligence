@@ -30,7 +30,7 @@ DynamoDB key or TTL changes, a prompt changes, or the pipeline gains or loses a 
 
 4. **Add a design-decision entry.** Open
    [06-design-decisions](../02-architecture/06-design-decisions.md) and append one
-   paragraph: what was decided, why, date, and source. Do not edit D001–D026; take the
+   paragraph: what was decided, why, date, and source. Do not edit an existing ID; take the
    next unused ID. If the
    decision is already captured by a §15 row, add the entry and leave §15 alone.
 

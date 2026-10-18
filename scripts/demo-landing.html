@@ -5,11 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Front Door Intelligence — demos</title>
     <!--
-      The landing page for the hosted demos. Staged by .github/workflows/demos.yml at
-      deploy time: web/dist/ lands under ./dashboard/, firetv/dist/ under ./overlay/,
-      and this file becomes the site root. Static, no scripts, palette matched to both
-      front ends. Everything below says out loud that the demos run fixture data — the
-      same honesty rule the demos themselves follow.
+      The landing page for the hosted demos. Staged by scripts/stage-demos.mjs (which the
+      demos.yml workflow also runs): web/dist/ lands under ./dashboard/, firetv/dist/
+      under ./overlay/, and this file becomes the site root — so its links are relative
+      to the staged root and DO NOT resolve if you open this file straight from scripts/.
+      Preview the hosted experience with:  node scripts/stage-demos.mjs && npx serve site
+      Static, no scripts, palette matched to both front ends. Everything below says out
+      loud that the demos run fixture data — the same honesty rule the demos follow.
     -->
     <style>
       :root { color-scheme: dark; --bg:#10131a; --panel:#181d27; --line:#2b3240; --text:#eef1f6; --muted:#9aa4b5; --accent:#7fd1c1; }
@@ -19,6 +21,9 @@
       p.sub { margin:0; color:var(--muted); max-width:44rem; text-align:center; }
       a.card { display:block; width:min(30rem,100%); background:var(--panel); border:1px solid var(--line); border-radius:.75rem; padding:1.25rem 1.5rem; color:var(--text); text-decoration:none; }
       a.card:hover { border-color:var(--accent); }
+      a.card--primary { border-color:var(--accent); background:linear-gradient(180deg,#1c2430,#181d27); }
+      a.card--primary strong { font-size:1.15rem; }
+      a.card--primary em { font-style:normal; color:var(--accent); }
       a.card strong { color:var(--accent); display:block; margin-bottom:.35rem; }
       a.card span { color:var(--muted); font-size:.95rem; }
       footer { color:var(--muted); font-size:.85rem; max-width:44rem; text-align:center; }
@@ -26,15 +31,22 @@
   </head>
   <body>
     <h1>Front Door Intelligence</h1>
-    <p class="sub">A Ring doorbell press becomes one sentence of plain English on your TV. Amazon Developer Hackathon 2026 — Ring track. Both demos below run fixture data through the production code; nothing at a real front door was recorded.</p>
+    <p class="sub">A Ring doorbell press becomes one sentence of plain English on your TV. Amazon Developer Hackathon 2026 — Ring track. Every demo below runs fixture data through the production clients; nothing at a real front door was recorded, and nothing below was timed from a deployed system.</p>
+    <a class="card card--primary" href="./dashboard/pipeline.html">
+      <strong>Start here — the whole chain, both screens at once</strong>
+      <span>One doorbell press walking through all five stages. The television is the real Fire TV
+      overlay client and the timeline is the real dashboard, wired to one fixture stream so they
+      cannot disagree. Watch each event appear <em>before</em> its sentence — that gap is the
+      architecture, not a loading artefact.</span>
+    </a>
     <a class="card" href="./overlay/overlay.html">
-      <strong>Fire TV overlay — the moment</strong>
+      <strong>Fire TV overlay — the moment, on its own</strong>
       <span>What a television shows when the doorbell rings: the sentence, the snapshot, a 15-second auto-dismiss, and a dismiss button. New fixture events arrive every few seconds.</span>
     </a>
     <a class="card" href="./dashboard/demo.html">
       <strong>Web dashboard — the day</strong>
       <span>What the homeowner reviews at the end of the day: every event, its snapshot, and a summary of the day, with pending events shown honestly.</span>
     </a>
-    <footer>The dashboard's live page (<a style="color:var(--accent)" href="./dashboard/index.html">here</a>) is the same client pointed at a real deployment; without one it renders its honest error state. The code behind both demos, and the five backend stages, are in the submission repository.</footer>
+    <footer>The dashboard's live page (<a style="color:var(--accent)" href="./dashboard/index.html">here</a>) is the same client pointed at a real deployment; without one it renders its honest error state. Everything above is fixture data — but the clients, the strings, and the five backend stages they read from are the submission repository's, not mock-ups.</footer>
   </body>
 </html>

@@ -1,6 +1,6 @@
 **Back:** [00-overview](./00-overview.md)
 
-**Verified against:** the working machine, checked with `command -v` and `--version` for each runtime; `package.json`, `package-lock.json`, `tsconfig.json`, `web/tsconfig.json`, and `firetv/tsconfig.json` read in full; `scripts/build-lambda.mjs`, `scripts/build-web.mjs`, `scripts/build-firetv.mjs`, and `scripts/verify-bundle.mjs` read in full; the contract's `runtimes`, `packageManager`, `commands`, and `workspaces` blocks. The registry hang behind D029 and D030 was measured directly on 2026-10-03: `npm view left-pad version` and `npm install left-pad` both exceed a 240-second timeout, while `curl` to `https://registry.npmjs.org` returns 200 and `curl` of a package tarball downloads 3,619 bytes. Not verified: any `template.yaml` deploy behaviour — no AWS account or SAM CLI is available.
+**Verified against:** the working machine, checked with `command -v` and `--version` for each runtime; `package.json`, `package-lock.json`, `tsconfig.json`, `web/tsconfig.json`, and `firetv/tsconfig.json` read in full; `scripts/build-lambda.mjs`, `scripts/build-web.mjs`, `scripts/build-firetv.mjs`, `scripts/stage-demos.mjs`, and `scripts/verify-bundle.mjs` read in full; the contract's `runtimes`, `packageManager`, `commands`, and `workspaces` blocks. The registry hang behind D029 and D030 was measured directly on 2026-10-03: `npm view left-pad version` and `npm install left-pad` both exceed a 240-second timeout, while `curl` to `https://registry.npmjs.org` returns 200 and `curl` of a package tarball downloads 3,619 bytes. Not verified: any `template.yaml` deploy behaviour — no AWS account or SAM CLI is available.
 
 <!-- docs-check:expect-absent tsconfig.build.json -->
 
@@ -63,6 +63,7 @@ package manager; do not introduce a second lockfile.
 | `npm run build:web` | `node scripts/build-web.mjs` — esbuild bundles `web/src/` into `web/dist/app.js` for the browser, and copies the HTML and CSS beside it |
 | `npm run build:firetv` | `node scripts/build-firetv.mjs` — esbuild bundles `firetv/src/` into `firetv/dist/overlay.js` for the WebView that hosts the overlay, and copies the HTML and CSS beside it |
 | `npm run build:verify` | `node scripts/verify-bundle.mjs` — asserts no bundled file requires a package it was not given |
+| `node scripts/stage-demos.mjs` | Stages the hosted demo site into `site/` — dashboard under `dashboard/`, overlay under `overlay/`, landing page at the root. The same staging the demos workflow runs in CI, runnable locally so the hosted experience previews without a push |
 | `npm run typecheck:web` | `tsc --noEmit -p web/tsconfig.json` — the dashboard's half of `npm run typecheck` |
 | `npm run typecheck:firetv` | `tsc --noEmit -p firetv/tsconfig.json` — the overlay client's half of `npm run typecheck` |
 

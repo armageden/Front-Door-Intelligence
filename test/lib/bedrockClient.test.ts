@@ -242,6 +242,50 @@ describe('snapshotStore', () => {
   });
 });
 
+describe('stop_reason — a truncated response is not a description', () => {
+  // Verified against the Bedrock Claude request/response reference, 2026-10-04:
+  // stop_reason is `max_tokens` when "the generated text exceeded the value of the
+  // max_tokens input field". The content array still holds text in that case.
+  it('rejects a response cut off at max_tokens rather than storing half a sentence', async () => {
+    const { send } = okWith({
+      content: [{ type: 'text', text: 'A person places a medium' }],
+      stop_reason: 'max_tokens',
+    });
+    const client = createBedrockClient({ modelId: MODEL, region: 'us-east-1', send });
+
+    // §3.3 promises one sentence. A mid-word fragment presented as a complete
+    // description is worse than the deterministic fallback it would replace.
+    await expect(client.describeImage(JPEG)).rejects.toThrow(/truncated at max_tokens/);
+  });
+
+  it('accepts a normal end_turn response', async () => {
+    const { send } = okWith({
+      content: [{ type: 'text', text: 'A person places a medium box by the door.' }],
+      stop_reason: 'end_turn',
+    });
+    const client = createBedrockClient({ modelId: MODEL, region: 'us-east-1', send });
+
+    await expect(client.describeImage(JPEG)).resolves.toBe('A person places a medium box by the door.');
+  });
+
+  it('names a content-classifier refusal distinctly from a transport failure', async () => {
+    // A refusal returns an EMPTY content array, so it reaches the "no text" branch. Both
+    // paths end in FR11's fallback, but they are not the same event and the logs should
+    // not claim one is the other.
+    const { send } = okWith({ content: [], stop_reason: 'refusal' });
+    const client = createBedrockClient({ modelId: MODEL, region: 'us-east-1', send });
+
+    await expect(client.describeImage(JPEG)).rejects.toThrow(/content classifier/);
+  });
+
+  it('still throws the generic message when stop_reason is absent and there is no text', async () => {
+    const { send } = okWith({ content: [] });
+    const client = createBedrockClient({ modelId: MODEL, region: 'us-east-1', send });
+
+    await expect(client.describeImage(JPEG)).rejects.toThrow(/no extractable text/);
+  });
+});
+
 describe('summariseText', () => {
   it('sends text and no image, with the caller system prompt and token budget', async () => {
     const { send, spy } = okWith({ content: [{ type: 'text', text: 'A quiet day.' }] });

@@ -17,8 +17,8 @@ Reproduced from `prd.md` §13. "Present" is checked against the working tree.
 | Public GitHub repo with MIT License in About section | **Partly** — `LICENSE` exists; whether the repo is public and the license is set in the About section is a GitHub setting, not a file |
 | README with setup instructions and environment variable template | **Yes** — `README.md` covers setup, the command table, and every variable; `.env.example` is the committed template |
 | Demo video < 3 minutes (uploaded, public) | No — external deliverable |
-| Devpost submission form filled (track: Ring) | No — external deliverable |
-| Friction Log in repo root | **Yes** — `FRICTION_LOG.md`, 20 entries in the six-field shape |
+| Devpost submission form filled (tracks: Ring, Fire TV) | No — external deliverable |
+| Friction Log in repo root | **Yes** — `FRICTION_LOG.md`, 27 entries in the six-field shape |
 | Working demo accessible to judges | **Yes, locally and by pipeline** — `web/dist/demo.html` and `firetv/dist/overlay.html` render fixture data through the production code with no backend (D032, D034); both were rendered and exercised in a real browser on 2026-10-04. `.github/workflows/demos.yml` publishes both, with a landing page, to GitHub Pages on every push to `main` (D035) — one manual Pages enable plus a push away from a public URL. The backend itself is not deployed, so the demos carry fixture data by design |
 | AWS Builder mini-challenge: documented Bedrock integration | **Partly** — `src/lib/bedrockClient.ts` is written and documented in [04-bedrock-client](../04-libraries/04-bedrock-client.md), but the integration has never run against Bedrock |
 | Open Source mini-challenge: repo is public + MIT licensed | **Partly** — `LICENSE` exists; the rules require a *second*, distinct repository alongside the primary submission, and none exists (Friction Log Entry 18) |
@@ -33,17 +33,15 @@ regardless.
 
 | Date | Version | Description | Author |
 |---|---|---|---|
-| 2026-09-28 | 1.0 | Initial PRD created | [Your Name] |
+| 2026-09-28 | 1.0 | Initial PRD created | farhan |
+| 2026-10-16 | 1.1 | Corrected against the Devpost Official Rules: FR3 subtype values (flat, not dotted), NFR1/NFR4/NFR6 citations, private-repo constraint (private repos are judgeable), Vega OS testing constraint (emulator sufficient). All six dead `[reference:N]` markers removed. Evidence: `docs/05-hackathon-requirements/03-doc-conflicts.md`. | farhan |
+| 2026-10-16 | 1.2 | Primary Track set to **Ring, Fire TV**, re-verified against the live Rules: §4 imposes no entry limit and §8 caps only prizes *won*. Goals §2 and Background §3 updated to match. Evidence: `docs/05-hackathon-requirements/03-doc-conflicts.md` conflict 2. | farhan |
 
 Two rules follow from the table's existence:
 
 1. Any edit to `prd.md` gets a new row. Do not rewrite history rows.
 2. The header table at the top of `prd.md` carries a `Version` field that must be
    bumped to match the newest change-log row.
-
-The author field still reads `[Your Name]`. Replace it when making the first substantive
-edit — see
-[01-update-a-requirement](../00-how-to/01-update-a-requirement.md).
 
 ## Related
 

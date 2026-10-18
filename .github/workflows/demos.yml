@@ -1,9 +1,10 @@
 name: demos
 
-# Publishes the two demo pages to GitHub Pages on every push to main: the dashboard
-# (web/dist/ → /dashboard/) and the Fire TV overlay client (firetv/dist/ → /overlay/),
-# with scripts/demo-landing.html as the site root, so judges and the demo video can open
-# both front ends without building anything.
+# Publishes the demo pages to GitHub Pages on every push to main: the dashboard
+# (web/dist/ → /dashboard/, which includes the pipeline demo at pipeline.html — the primary
+# page) and the Fire TV overlay client (firetv/dist/ → /overlay/), with
+# scripts/demo-landing.html as the site root, so judges and the demo video can open both
+# front ends without building anything.
 #
 # The build commands are not hardcoded here — like docs-check.yml, they are read from
 # commands.<name>.run in the contract, so the workflow cannot drift from the documented
@@ -67,11 +68,7 @@ jobs:
         run: ${{ steps.builds.outputs.buildFiretv }}
 
       - name: Stage the demo site
-        run: |
-          mkdir -p site/dashboard site/overlay
-          cp -r web/dist/. site/dashboard/
-          cp -r firetv/dist/. site/overlay/
-          cp scripts/demo-landing.html site/index.html
+        run: node scripts/stage-demos.mjs
 
       - uses: actions/configure-pages@v5
 

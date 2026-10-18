@@ -10,7 +10,7 @@
  */
 
 import { start } from './app';
-import type { OverlayMessage, SocketFactory } from './client';
+import type { OverlayMessage, SocketFactory, SocketHandlers } from './client';
 
 function liveSocketFactory(): SocketFactory {
   return (url, handlers) => {
@@ -22,15 +22,26 @@ function liveSocketFactory(): SocketFactory {
   };
 }
 
-/** One scripted connection: opens instantly, then cycles fixture payloads forever. */
+/**
+ * One scripted connection: opens instantly, delivers the first fixture **immediately**, then
+ * cycles the rest forever.
+ *
+ * The immediate first push is the whole point of this function and it was wrong once: using
+ * `setInterval` alone means the first card appears one full interval after load, so the demo
+ * opened on "Waiting for the front door…" and stayed there. With the 8-second cadence that
+ * is eight seconds of an apparently broken page — the worst first impression a demo can have,
+ * and the exact moment a judge decides it does not work.
+ */
 function demoSocketFactory(messages: readonly OverlayMessage[], intervalMs: number): SocketFactory {
   let index = 0;
+  const emit = (handlers: SocketHandlers): void => {
+    handlers.onData(JSON.stringify(messages[index % messages.length]!));
+    index += 1;
+  };
   return (_url, handlers) => {
     handlers.onOpen();
-    const timer = setInterval(() => {
-      handlers.onData(JSON.stringify(messages[index % messages.length]!));
-      index += 1;
-    }, intervalMs);
+    emit(handlers);
+    const timer = setInterval(() => emit(handlers), intervalMs);
     return {
       close: () => clearInterval(timer),
     };
@@ -63,7 +74,8 @@ const FIXTURE_EVENTS: readonly OverlayMessage[] = [
       'data:image/svg+xml,' +
       encodeURIComponent(
         '<svg xmlns="http://www.w3.org/2000/svg" width="320" height="180">' +
-          '<rect width="320" height="180" fill="#181d27"/>' +
+          '<rect width="320" height="180" fill="#0d1016"/>' +
+    '<rect x="0.5" y="0.5" width="319" height="179" fill="none" stroke="#2b3240"/>' +
           '<rect x="60" y="100" width="120" height="50" rx="6" fill="#2b3240"/>' +
           '<circle cx="90" cy="155" r="8" fill="#9aa4b5"/><circle cx="150" cy="155" r="8" fill="#9aa4b5"/>' +
           '<text x="160" y="30" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" fill="#9aa4b5">demo snapshot placeholder</text>' +
@@ -79,7 +91,8 @@ const FIXTURE_EVENTS: readonly OverlayMessage[] = [
       'data:image/svg+xml,' +
       encodeURIComponent(
         '<svg xmlns="http://www.w3.org/2000/svg" width="320" height="180">' +
-          '<rect width="320" height="180" fill="#181d27"/>' +
+          '<rect width="320" height="180" fill="#0d1016"/>' +
+    '<rect x="0.5" y="0.5" width="319" height="179" fill="none" stroke="#2b3240"/>' +
           '<circle cx="150" cy="70" r="14" fill="#2b3240"/>' +
           '<rect x="128" y="90" width="44" height="60" rx="6" fill="#2b3240"/>' +
           '<text x="160" y="30" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" fill="#9aa4b5">demo snapshot placeholder</text>' +
@@ -95,7 +108,8 @@ const FIXTURE_EVENTS: readonly OverlayMessage[] = [
       'data:image/svg+xml,' +
       encodeURIComponent(
         '<svg xmlns="http://www.w3.org/2000/svg" width="320" height="180">' +
-          '<rect width="320" height="180" fill="#181d27"/>' +
+          '<rect width="320" height="180" fill="#0d1016"/>' +
+    '<rect x="0.5" y="0.5" width="319" height="179" fill="none" stroke="#2b3240"/>' +
           '<text x="160" y="95" text-anchor="middle" font-family="system-ui, sans-serif" font-size="12" fill="#9aa4b5">demo snapshot placeholder</text>' +
           '</svg>',
       ),

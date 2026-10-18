@@ -19,9 +19,14 @@ are linked at the bottom.
 | Hit a tooling problem worth points | [03-add-a-friction-log-entry](./03-add-a-friction-log-entry.md) |
 | Finished any task that touched code or config | [04-run-a-docs-sync-pass](./04-run-a-docs-sync-pass.md) |
 | Created the first file of a new subsystem | [05-open-a-new-code-subject](./05-open-a-new-code-subject.md) |
+| Deploying it, or proving it works | [06-deploy-and-verify](./06-deploy-and-verify.md) |
 
 The last one matters most for a new contributor: it is how the tree stops being a plan
 and starts documenting real code.
+
+**`06-deploy-and-verify` is the one to read before submitting.** It is the only recipe here
+that can invalidate the code, because everything it checks is an integration this
+repository has never performed.
 
 ## How these recipes were chosen
 
@@ -30,10 +35,11 @@ catalogue in `prd.md` §5, the section layout of `ARCHITECTURE.md` §3 and §11,
 submission checklist in `prd.md` §13. **Not** from a generic template.
 
 Git history contributed very little, and less than it appears to: the repository has
-three commits, and all three predate the code. The first added the two spec documents,
-the second was a docs pass, and the third was the webhook pipeline. So there is still
-no code *history* to mine for recurring change shapes — only one commit of code. When
-more lands, revisit this list against `git log` and re-pick.
+six commits, and every one predates this documentation set: the two spec documents, a
+docs pass, the webhook pipeline, the overlay-delivery and event-query stages, a context
+change, and a test pass. The phases these recipes describe are the uncommitted ones, so
+there is still little code *history* to mine for recurring change shapes. When more
+lands, revisit this list against `git log` and re-pick.
 
 ## Verify after any recipe
 

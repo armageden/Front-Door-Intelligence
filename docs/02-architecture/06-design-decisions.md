@@ -1,8 +1,8 @@
 **Back:** [00-overview](./00-overview.md)
 
-**Verified against:** `ARCHITECTURE.md` §15, read directly. D001–D007 are paraphrases of that table's seven rows; D008–D013 were made during the tooling and webhook-ingress phases and are not in that table. D014–D021 were added by the describe and overlay-delivery phases, D022–D023 by the query phase, D024 by the submission-blockers phase, D025–D026 by the daily-summary phase, D027–D028 by the retention-and-cost phase, D029–D030 by the web-dashboard phase, D031 by the device-name phase, D032–D033 by the demo phase, and D034 by the firetv phase; all are likewise absent from the spec's table. The ADR-lite format is this repository's own and is not a project artefact. Take the next unused ID; gaps are never filled.
+**Verified against:** `ARCHITECTURE.md` §15, read directly. D001–D007 are paraphrases of that table's seven rows; D008–D013 were made during the tooling and webhook-ingress phases and are not in that table. D014–D021 were added by the describe and overlay-delivery phases, D022–D023 by the query phase, D024 by the submission-blockers phase, D025–D026 by the daily-summary phase, D027–D028 by the retention-and-cost phase, D029–D030 by the web-dashboard phase, D031 by the device-name phase, D032–D033 by the demo phase, D034 by the firetv phase, D035 by the hosting phase, D036 by the full audit, D037–D038 by the gap-closure phase, D039 by the demo-improvement phase, D040 by the coverage phase, and D041 by the rules-reconciliation phase; all are likewise absent from the spec's table. The ADR-lite format is this repository's own and is not a project artefact. Take the next unused ID; gaps are never filled.
 
-<!-- docs-check:expect-absent test/handlers.test.ts tsconfig.build.json web/src/App.tsx web/src/components/EventTimeline.tsx scripts/verify-web.mjs firetv/App.tsx firetv/components/Overlay.tsx -->
+<!-- docs-check:expect-absent test/handlers.test.ts tsconfig.build.json web/src/App.tsx web/src/components/EventTimeline.tsx scripts/verify-web.mjs firetv/App.tsx firetv/components/Overlay.tsx src/handlers/bedrockDescriber.ts bedrockDescriber.ts -->
 
 # Design decisions (ADR-lite)
 
@@ -54,14 +54,27 @@ so the webhook handler must normalise the payload into a structured event object
 any downstream stage can reason about it. Getting this wrong produces descriptions of
 objects the system never received.
 
-## D005 — One app, one primary track
+## D005 — One app, one primary track — **REVERSED 2026-10-16**
 
 **Date:** 2026-09-28. **Source:** `ARCHITECTURE.md` §15 and §3.7.
+**Reversed:** 2026-10-16, on live Rules §4 and §8. See **D041** below and
+[03-doc-conflicts](../05-hackathon-requirements/03-doc-conflicts.md) conflict 2. The ID is
+retained and not reused.
 
-The design now states explicitly that one app can only be entered into one primary
-track. The Alexa+ MCP server and the Bee context ingest are optional supporting
-adapters within the Ring entry, not separate track submissions. This keeps FR16 and
-FR17 honestly scoped as MAY.
+**As originally decided:** the design stated explicitly that one app can only be entered into one
+primary track, with the Alexa+ MCP server and the Bee context ingest as optional supporting
+adapters within the Ring entry.
+
+**Why it was reversed:** the rule does not exist. Live Rules §4 requires a project to be built
+"into the following primary tracks" and lists all four, imposing no entry limit; §8 caps only what
+may be *won* ("A project can only win one (1) track prize and one (1) mini challenge prize"); the
+submission form asks which "**track(s)**" you are entering; and DevRel confirmed on the forum that
+a project may select and be judged for both. The decision log had recorded adding a rule that was
+never in the Rules — this entry is the place that mistake was written down, and leaving it
+uncorrected would have contradicted the very documents it governs.
+
+**What survives from it:** FR16 and FR17 remain honestly scoped as MAY. Alexa+ and Bee are still
+out of scope as entries; only Fire TV was added, alongside Ring.
 
 ## D006 — Kiro Crew usage recorded for AWS Builder qualification
 
@@ -328,6 +341,12 @@ The queue message carries identifiers only. SQS caps a message at 256 KB, so an 
 would fail at runtime rather than at validation, and the events table is already the
 source of truth — the queue is a signal, not a record. The consumer re-reads the event
 rather than trusting the message.
+
+This is the stage several documents cite when they say the §3.3 describer was **folded
+into** the §3.2 snapshot fetcher: `src/handlers/bedrockDescriber.ts` was never created, and
+FR5's Bedrock call lives inside `snapshotFetcher.ts`, which implements FR4 and FR5 together.
+The spec's tree still lists the separate file, so `bedrockDescriber.ts` is declared absent
+rather than simply missing.
 
 ### D019 — Every failure path still writes a description
 
@@ -917,7 +936,12 @@ The submission checklist's "working demo accessible to judges" was satisfied loc
 The fix keeps the property that matters — **the demos deploy from the repository, not
 from a machine** — by publishing both built dist trees to GitHub Pages on every push to
 main, via `.github/workflows/demos.yml`, with `scripts/demo-landing.html` as the site
-root linking the two.
+root linking the two. The staging is a script (`scripts/stage-demos.mjs`) shared by the
+workflow and the command line, so CI and local run the identical steps — the lesson of
+Entry 14 applied a second time — and the first local run of it caught the failure mode
+this decision would otherwise have shipped: the landing page's links are relative to the
+staged root, so the file opened straight from `scripts/` 404s, which is correct for a
+deployment template and invisible until someone opens it.
 
 **The workflow reads its build commands from the contract**, exactly as the checks
 workflow does, because Entry 14's own actionable suggestion was to derive steps
@@ -935,6 +959,256 @@ GitHub Actions) and pushes — the workflow is written, not run; until then no d
 may cite the URL as live. Second, what publishes is the two front ends only: the backend
 stages remain undeployed, so the demos carry fixture data by design, and the WebSocket
 the overlay client would connect to in live mode does not exist at the public URL.
+
+### D036 — Neither browser tree has reverse coverage, and the globs cannot be widened without breaking the two tsconfigs
+
+**Date:** 2026-10-04. **Source:** full audit.
+
+Check 5 requires every file matching `libGlobs` / `handlerGlobs` to be named in a document.
+Both globs are anchored at the repository root — `src/lib/**/*.ts` and
+`src/handlers/**/*.ts` — so **`web/src/api.ts` and `firetv/src/client.ts` match neither**. The
+two front ends are product code in this repository with no reverse coverage at all: a new
+module under either tree can land, be built, be tested, and be entirely undocumented, and
+`docs:check` stays green.
+
+That is a real blind spot in a gate this repository leans on, so it was worth asking whether
+the globs could simply be widened. **They cannot, and the reason is structural.** Adding
+`web/src/**/*.ts` to `libGlobs` would put those files into check 5's coverage set, which is
+harmless — but the same files are also imported by suites under `test/` and `web/test/`, and
+the root `tsconfig.json` is **Node**. A dashboard module has no `lib` DOM types under it, so
+widen the glob and the *documented* fix for "reverse coverage should apply to the front ends"
+becomes "the dashboard no longer typechecks against the runtime it actually runs in". D029
+already established the two-runtime split; widening coverage would undo it.
+
+The correct fix is two new glob pairs plus an explicit exclusion, so check 5 can see the
+browser trees **without** them entering the Node typecheck. That is a change to
+`scripts/docs-check.mjs` and to how the globs are consumed, not a contract edit alone, and
+it is left to the author rather than half-applied.
+
+Until then the front ends are documented by hand, and **coverage is reported as per-glob,
+never as a blanket claim** — which is what the two browser surfaces' coverage numbers are
+for. `firetv/src/main.ts` at 14.28% is the clearest single illustration: it is demo wiring
+verified by opening the page, not by an assertion.
+
+**Not fixed, deliberately.** Recording the gap is more useful than closing it badly.
+
+### D037 — CORS is parameterised, not wildcarded, and its absence was the worst-shaped bug in the repository
+
+**Date:** 2026-10-04. **Source:** gap-closure phase.
+
+The HTTP API declared **no `CorsConfiguration` for the entire life of the template**, and that
+single omission would have made the live dashboard fail against a correctly deployed stack
+while every fixture demo worked perfectly.
+
+The chain, all four parts of which are now on disk:
+
+- `.github/workflows/demos.yml` publishes the dashboard to **GitHub Pages**.
+- `web/src/api.ts` fetches a **user-entered** API base URL — a different origin by definition.
+- It sends **`X-Query-Key`**, which is not a CORS-safelisted request header, so the browser
+  issues a **preflight** before the real request.
+- With no CORS config the preflight receives no `Access-Control-Allow-Origin` and the fetch
+  fails.
+
+**Why this is recorded as a decision and not just a fix.** The shape of the bug is the point.
+A fixture demo is same-origin and never preflights, so every test, every render, and every
+demo a judge opens would be green — and the one configuration that matters would be broken.
+This is the same failure class as Friction Log Entry 14, where a gate was believed to be
+running and was not: **something that cannot fail loudly, in the place you actually test.**
+
+**`DashboardAllowedOrigins` is a `CommaDelimitedList` parameter, defaulting to `*`.** Two
+reasons for the parameter rather than a hard-coded value. A wildcard alongside a custom auth
+header is the shape that draws a security review finding, and `GET /events/today` returns a
+homeowner's door activity, so **the set of pages permitted to read it is a security control
+the deployer should own**. The default is `*` because a demo must work on first deploy with
+no extra configuration, and the parameter's description says plainly what to narrow it to.
+
+`AllowCredentials` is deliberately **absent**: the key travels in a header, never a cookie,
+so there is nothing to send, and adding it would restrict the wildcard case for no gain.
+
+**The snapshot bucket gets the same treatment**, with `GET`/`HEAD` only. That one is lower
+severity — an `<img>` paints without `Access-Control-Allow-Origin` — but any future canvas
+read or `fetch()` of the bytes would fail on it, and it is free while the bucket is being
+edited.
+
+**Not verified:** no request has crossed an origin in this environment, because there is no
+API Gateway and no SAM CLI here. What *is* verified is that both configurations parse, that
+the origin list is parameterised rather than baked in, and that the client's actual header
+set (`Content-Type`, `X-Query-Key`) is what the allowlist names.
+
+### D038 — A `$default` WebSocket route, because the route expression matches nothing the pipeline sends
+
+**Date:** 2026-10-04. **Source:** gap-closure phase.
+
+`OverlayWebSocketApi` declares `RouteSelectionExpression: '$request.body.action'`, and
+**every payload the overlay pusher posts is a bare §3.4 message with no `action` field.**
+The expression therefore routes nothing the pipeline sends.
+
+`$connect` is unaffected — it carries a query string rather than a body and is matched by
+route key, not by expression — which is exactly why the delivery path works today and why
+the defect sat undetected through two working front ends.
+
+It was, however, one client-side message away from a 403 on the socket. `OverlayDefaultRoute`
+now catches everything unmatched and routes it to the **same function as `$disconnect`**: a
+data frame is not a lifecycle event, so the client ignores it and the connection is left
+intact. That turns a silent close into a no-op, which is the difference between a bug a user
+reports and a bug a user never notices.
+
+**Rejected: changing `RouteSelectionExpression` to something the payloads actually contain**,
+such as `$request.body.event_id`. That would couple the routing layer to the payload schema, so
+a change to §3.4 becomes a potential deployment failure. A catch-all route is decoupled from
+both.
+
+**Not verified:** no WebSocket connection has been opened against a deployed API Gateway. The
+route is asserted to parse and to name the right target; its runtime behaviour is not.
+
+### D039 — A third demo shows the chain, and it is the only file allowed to cross the tree boundary
+
+**Date:** 2026-10-04. **Source:** demo-improvement phase.
+
+The two existing demos are separate pages showing the two ends of the pipeline. A judge
+opens one, then the other, and has to infer that they are the same system — while the thing
+being built is a *chain*, and a chain is not visible from its ends.
+
+`web/src/pipeline.ts` runs the chain. Both surfaces on that page are the production clients:
+the dashboard is `load()` from `app.ts` over a fixture transport, and the television is
+`start()` from `firetv/src/app.ts` over a scripted socket. Both read one `daySoFar()` call, so
+they **cannot disagree** — which is the property the two separate demos could not offer.
+
+**It shows one thing the others cannot: the pending state.** A real event is stored and
+acknowledged inside NFR1's five seconds, and its sentence arrives seconds later from a queue.
+So each event appears in the timeline *before* it has a description, and is then filled in.
+That is FR12's `processed` flag and the dashboard's honesty rule demonstrated rather than
+asserted, and no screenshot of a finished page can convey it.
+
+**One file is permitted to cross the tree boundary, and that cost a fourth typecheck pass.**
+D029 split the repository into two runtimes so neither could typecheck against the other's
+globals. This demo genuinely needs both clients on one page, so `web/src/pipeline.ts` is the
+single exception — and `web/tsconfig.pipeline.json` exists solely to hold it, with `rootDir` at
+the repository root. Everything else in `web/` still cannot see `firetv/`, which is the point:
+**the exception is one named file, not a relaxed boundary.** Widening the boundary would have
+been easier and would have destroyed the guarantee.
+
+**The stage strip is narration, not a trace.** Each stage lights when the demo says it
+happened, at the same moment it feeds the next surface. Nothing is measured and nothing is
+timed from a real system; the page says so in the banner. It exists because the *order* is the
+design, and the order is the one thing a fixture demo can honestly show.
+
+**Rejected: an iframe embedding the existing overlay page.** It would have kept the tree
+boundary absolutely clean, at the cost of the two surfaces being separate documents with
+separate clocks — so a card could appear on the television at a moment the timeline had not
+yet been told about. The whole claim is that they are one system.
+
+**The loop's control flow was extracted so it could be tested at all.** `runLoop()` is pure
+control — no DOM — which is the only way "the page keeps going instead of freezing" becomes an
+assertion rather than something a human has to sit and watch for. Extracting it also exposed a
+config fault that had been hiding underneath: `web/tsconfig.pipeline.json` inherits `exclude`
+from the config it extends, so it was typechecking **no files at all** while reporting success
+(Friction Log Entry 25). A looping demo cannot be driven by a fake DOM — that stub has no
+selector engine — so the fix was to make the timing injectable and the logic pure, rather than to
+build a DOM emulator.
+
+**Coverage of the new module is low and that is expected.** `web/src/pipeline.ts` reads 34%
+because its uncovered lines are `startPipeline()` — the DOM wiring: querying for panes, building
+the stage strip, the `ResizeObserver`, the flash. Its logic is covered: the stage order, the
+timing deltas, every branch of `daySoFar()`, and the loop itself — including that it repeats,
+that it clears the day between cycles, and that a cancel abandons an event mid-flight without
+pushing its sentence. This is the same shape as the SQS handler adapters and `firetv/src/main.ts`,
+and it is reported per-file rather than averaged away.
+
+**The stage strip's own limits are stated.** The five names and their one-line explanations are
+the demo's narration of the pipeline, not a trace of it. The banner says no stage was timed
+from a real system, and `TIMELINE_MS` is documented as the demo's pacing rather than FR6's
+unmeasured 8-second target.
+
+### D040 — Coverage was taken to 99.19% lines, and the last 0.81% was left uncovered on purpose
+
+**Date:** 2026-10-03. **Source:** coverage phase.
+
+Line coverage went from **77.45% to 99.19%**, statements 75.68% → 98.63%, functions 67.40% →
+98.23%, and the suite grew from 324 to 483 tests. Branch coverage is 92.85% and is the number
+worth quoting.
+
+**What the gap actually was, which was not what the number suggested.** The largest single
+block was the Lambda handlers' *adapters* — the `handler` exports that API Gateway and SQS
+actually invoke. The logic behind each was well tested; the wiring between the envelope, the
+three collaborators, and the answer out was untested, and that is the code which only ever
+runs in production. It closed with stubs at the module boundary and **no production change**.
+
+**Three findings came out of the work, and they are the reason it was worth doing beyond a
+number.**
+
+1. **A whole test file was typechecking nothing.** `web/tsconfig.pipeline.json` inherits
+   `exclude` from the config it extends, and the base excludes the very file it existed to
+   check. `npm run typecheck` printed a clean run of an empty program while concealing a
+   real compile error. Friction Log Entry 25.
+2. **A test helper could fail the whole suite without touching a failing test.** A demo loop
+   repaints with `void repaint()`, so a render in flight when one test ended resolved after
+   the next test removed the global document — `load()` caught the resulting error and tried to
+   *render* it, and that render threw again. It surfaced as an unhandled rejection attributed
+   to whichever test ran last, pointing at code none of them touched. `npm test` exited 1
+   while every one of its 483 tests passed.
+3. **`requireEnv` is unreachable in two handlers.** `modelId ?? requireEnv(BEDROCK_MODEL_ID)`
+   can only call `requireEnv` when `modelId` is nullish — and it always throws there. Its
+   `return value` line cannot execute. A coverage tool insisting on 100% would have driven
+   a change to production code to satisfy a number.
+
+**What was deliberately not covered, and why.** The remaining 13 statements are in the two
+browser entry points. Reaching them means running the real demo loop on an instant clock,
+which spins forever in microtasks and hangs the worker — a test for it is not possible without
+changing the loop's shape to suit the test. That is the wrong trade: **the number is not worth
+restructuring working code for.** The alternative — injecting the clock — is what the loop's
+`runLoop()` already does for the part worth testing.
+
+**The conclusion, stated plainly: 100% lines was not achieved, and the gap is now thirteen
+specific statements with reasons rather than a percentage that hid a hundred.** Coverage is
+still a floor and not a verdict. Of the three defects found today that coverage could not
+see — an eight-second blank first card, an invisible snapshot, a demo that froze after
+seventeen seconds — none would have been caught by reaching 100%.
+
+`npm run coverage:gaps` prints the remainder per file, with source, so the claim is checkable
+rather than asserted.
+
+### D041 — The Official Rules take precedence over this repository's own spec documents, and disagreements are corrected in place
+**Date:** 2026-10-16. **Source:** rules-reconciliation pass.
+
+The repository had verified the Devpost Official Rules on 2026-09-28 and recorded six places
+where `prd.md` and `ARCHITECTURE.md` state something the rules contradict — an invented
+one-track-only rule, a wrong judging rubric, a false private-repo claim, a friction-log template
+missing two of six required fields, an inflated device-testing risk, and six `[reference:N]`
+markers pointing at a reference list that does not exist. That research sat in
+`docs/05-hackathon-requirements/03-doc-conflicts.md` and was never applied.
+
+**The decision is to fix the spec rather than annotate it.** Three reasons, in order of weight.
+
+1. **These two files are submission artifacts.** A judge reads `prd.md` and `ARCHITECTURE.md`
+   before they read `docs/`. A correct claim sitting next to a stale one does not net out; the
+   judge sees the stale one.
+2. **A known-false claim in a spec is worse than an absent one**, because every downstream
+   decision gets made against it. The wrong rubric does not just lose points — it misdirects
+   prioritisation for the remaining eight days of the submission window.
+3. **`docs/` already did its job.** The conflict record is precise, sourced to section numbers,
+   and costs money only while it disagrees with the document it corrects. Keeping both in sync
+   permanently would be the expensive option.
+
+Conflicts 3–6 and the dead citations were corrected on 2026-10-16: the §14 judging table now
+carries the Stage One pass/fail gate and the four equally weighted criteria, the friction-log
+template carries all six required fields and the bonus is described as *recommended* rather than
+*earned*, the Vega device risk is split into the one that is real (no documented overlay API,
+D021) and the one that was inflated, the private-repo justification is corrected while the
+decision to publish publicly is kept, and `prd.md` FR3's event subtypes now match the API the
+code actually calls — flat `human`/`vehicle`/`motion`/`other_motion`, not the dotted
+`motion.human` form that belongs to a different Ring surface and matches nothing.
+
+**One conflict remains open and still costs money.** The Open Source mini-challenge needs a
+separate repository alongside the submission, and it needs a decision, not a correction. The
+invented one-track rule this section first named was corrected on the same day: the project now
+enters Ring **and** Fire TV — see conflict 2 in
+[03-doc-conflicts](../05-hackathon-requirements/03-doc-conflicts.md).
+
+**One caveat recorded rather than hidden.** The rules pages return 403 to automated requests,
+so none of the rule quotations behind these corrections could be re-fetched for this pass. They
+rest on the 2026-09-28 read. Anyone relying on the dual-track conclusion specifically should
+confirm it in a browser before acting on it.
 
 ### Related
 

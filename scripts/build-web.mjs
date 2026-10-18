@@ -39,6 +39,9 @@ const result = await build({
   entryPoints: [
     { in: join(WEB, 'src', 'main.ts'), out: 'app' },
     { in: join(WEB, 'src', 'demo.ts'), out: 'demo' },
+    // The pipeline demo. The only entry point that bundles two source trees, because it
+    // mounts the real Fire TV overlay client next to the real dashboard.
+    { in: join(WEB, 'src', 'pipeline-main.ts'), out: 'pipeline' },
   ],
   outdir: OUT,
   bundle: true,
@@ -58,7 +61,13 @@ const result = await build({
 // references and the page needs no server-side templating.
 writeFileSync(join(OUT, 'index.html'), readFileSync(join(WEB, 'index.html')));
 writeFileSync(join(OUT, 'demo.html'), readFileSync(join(WEB, 'demo.html')));
+writeFileSync(join(OUT, 'pipeline.html'), readFileSync(join(WEB, 'pipeline.html')));
 writeFileSync(join(OUT, 'app.css'), readFileSync(join(WEB, 'app.css')));
+writeFileSync(join(OUT, 'pipeline.css'), readFileSync(join(WEB, 'pipeline.css')));
+// Copied from the firetv tree so the pipeline page's television is styled by the overlay's
+// OWN stylesheet rather than by a lookalike maintained here. Copying at build time is what
+// keeps the two from drifting — a second copy of these rules would be a second thing to forget.
+writeFileSync(join(OUT, 'overlay.css'), readFileSync(join(ROOT, 'firetv', 'overlay.css')));
 
 const inputs = Object.keys(result.metafile.inputs);
 const bytes = Object.values(result.metafile.outputs).reduce((sum, o) => sum + o.bytes, 0);
@@ -66,4 +75,4 @@ console.log(`build-web: bundled ${inputs.length} module(s) into web/dist/`);
 for (const input of inputs) console.log(`  - ${input.replace(ROOT + '/', '')}`);
 console.log(`build-web: ${bytes} bytes total, no dependencies to inline`);
 console.log('build-web: serve web/dist/ as static files (any static host, or `npx serve`)');
-console.log('build-web: open demo.html for the fixture demo — no backend needed');
+console.log('build-web: open pipeline.html for the whole chain, demo.html for the day, index.html for live');

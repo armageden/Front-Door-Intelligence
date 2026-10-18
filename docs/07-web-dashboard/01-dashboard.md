@@ -1,6 +1,6 @@
 **Back:** [00-overview](./00-overview.md)
 
-**Verified against:** `web/src/api.ts` → `buildTodayUrl()`, `parseTodayResponse()`, `fetchToday()`, `QueryError`, read in full; `web/src/view.ts` → `formatClock()`, `formatSubtype()`, `formatDescription()`, `formatDevice()`, `formatEmptyDay()`, `formatSummary()`, `formatHeader()`, `timelineOrder()`, read in full; `web/src/app.ts` → `load()`, `start()`, read in full; `web/src/demo.ts` → `demoResponse`, `demoFetch`, `startDemo()`, read in full; `web/src/main.ts`, `web/index.html`, `web/demo.html`, `web/app.css` read in full; `web/tsconfig.json`, `web/package.json`, and `scripts/build-web.mjs` read in full; `web/test/dashboard.test.ts` (29 tests), `web/test/app.test.ts` (15 tests), and `web/test/demo.test.ts` (6 tests), all run; `web/test/fake-dom.ts` read in full; `npm run build:web` executed, producing `app.js` and `demo.js` in `web/dist/`. **Rendered in a real browser on 2026-10-04:** served from `web/dist/` over local HTTP, the demo page and the live page both opened, screenshotted, and their accessibility trees read; the live page's controls were exercised (a Load against a closed port changed the error from `HTTP 404` to `Failed to fetch`). Layout and styling matched the fake-DOM tests' predictions; nothing needed fixing. Still not verified: anything against a deployed backend, a real Ring snapshot, or a screen reader.
+**Verified against:** `web/src/api.ts` → `buildTodayUrl()`, `parseTodayResponse()`, `fetchToday()`, `QueryError`, read in full; `web/src/view.ts` → `formatClock()`, `formatSubtype()`, `formatDescription()`, `formatDevice()`, `formatEmptyDay()`, `formatSummary()`, `formatHeader()`, `timelineOrder()`, read in full; `web/src/app.ts` → `load()`, `start()`, read in full; `web/src/demo.ts` → `demoResponse`, `demoFetch`, `startDemo()`, read in full; `web/src/main.ts`, `web/index.html`, `web/demo.html`, `web/app.css` read in full; `web/tsconfig.json`, `web/package.json`, and `scripts/build-web.mjs` read in full; `web/test/dashboard.test.ts` (29 tests), `web/test/app.test.ts` (15 tests), and `web/test/demo.test.ts` (6 tests), all run; `web/test/fake-dom.ts` read in full; `npm run build:web` executed, producing `app.js` and `demo.js` in `web/dist/`. **Rendered in a real browser on 2026-10-04:** served from `web/dist/` over local HTTP, the demo page and the live page both opened, screenshotted, and their accessibility trees read; the live page's controls were exercised (a Load against a closed port changed the error from `HTTP 404` to `Failed to fetch`). **A second pass, on 2026-10-04 during a full audit, found one thing the fake-DOM tests could not: the snapshot placeholders were invisible.** The placeholder SVG's background was `#181d27` — exactly the card background — so each frame rendered as an empty box with a thin artefact in it and read as a broken image. Fixed to `#0d1016` with a visible border, and confirmed by reloading the page. This is the whole argument for looking at a rendered page: a background colour matching its container is not a property any assertion in this repository could see. Friction Log Entry 21. Still not verified: anything against a deployed backend, a real Ring snapshot, or a screen reader.
 
 <!-- docs-check:expect-absent web/src/App.tsx web/src/components/EventTimeline.tsx scripts/verify-web.mjs -->
 
@@ -116,6 +116,44 @@ quiet false claim this dashboard refuses everywhere else.
 to: the fixture is re-parsed through `parseTodayResponse()`, so a response-shape change
 fails a test rather than blanking a judge's page. Six tests cover the fixture, the
 transport, and the rendered output.
+
+## Three demos, and why there are three
+
+| Page | What it is for |
+|---|---|
+| `pipeline.html` | **The one to open first.** Both surfaces on one page, running the chain |
+| `demo.html` | The dashboard alone — the day, the timeline, the summary |
+| `index.html` | The live dashboard, pointed at a real deployment by the operator |
+
+`pipeline.html` exists because the other two show the two *ends* of the pipeline, and a
+judge opening them in turn has to infer they are the same system. The thing being built is a
+chain. On that page both surfaces are the production clients — `load()` from `app.ts` and
+`start()` from `firetv/src/app.ts` — reading a single `daySoFar()` call, so they cannot
+disagree. It also shows the one thing a finished screenshot cannot: an event appearing in
+the timeline *before* its sentence exists, which is the webhook answering inside five seconds
+while the description arrives from a queue afterwards.
+
+Two implementation consequences, both worth knowing before editing it:
+
+- **It loops, and it does not freeze.** The first version ran its three events once and then
+  sat there, perfectly rendered and motionless — a judge who looked away for half a minute came
+  back to a screenshot and reasonably concluded it had finished or died. The sequence now
+  restarts, and a **Replay** button restarts it on demand. Its control flow is a pure
+  `runLoop()`, so "it keeps going" is an assertion rather than something a human has to sit
+  and watch for.
+- **The day empties between cycles.** An earlier version only reset the repaint cache key and
+  re-rendered the same three events, so the timeline grew 3, 6, 9, 12… and a judge watching long
+  enough saw a day with forty events on it. The arrays are cleared, not just the key.
+- **It is the only file that imports across `web/` and `firetv/`**, which is why
+  `web/tsconfig.pipeline.json` exists and why `npm run typecheck` runs four `tsc` passes.
+  That config must set `"exclude": []` explicitly: an extending config inherits `exclude`,
+  and it was silently checking **nothing** while reporting success. Friction Log Entry 25,
+  and the verification recipe is in
+  [03-verification-commands](../03-repository/03-verification-commands.md). Decision D039.
+- **The television is scaled, not reflowed.** `firetv/overlay.css` is sized for a television,
+  so the pane lays it out at 1280x720 and applies `transform: scale()`. Letting it reflow into
+  a narrow pane wrapped the sentence to one word per line and burst the card out of its
+  container — Friction Log Entry 24.
 
 ## The build, and what it does not verify
 

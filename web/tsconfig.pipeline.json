@@ -1,0 +1,33 @@
+{
+  "$comment": [
+    "The pipeline demo spans two source trees on purpose: web/src/pipeline.ts mounts the",
+    "real Fire TV overlay client on the same page as the real dashboard, because the point",
+    "of that demo is that they are one system. Every other file in web/ stays inside its own",
+    "tree, which is what D029's two-tsconfig split enforces.",
+    "",
+    "rootDir is the repository root because this one file legitimately reaches across.",
+    "It is the only config that does, and adding to it is the signal that a new file has",
+    "become cross-cutting."
+  ],
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "..",
+    "noEmit": true
+  },
+  "include": [
+    "../firetv/src/**/*.ts",
+    "src/pipeline-main.ts",
+    "src/pipeline.ts",
+    "test/browserRemainder.test.ts",
+    "test/entrypoints.test.ts",
+    "test/pipeline.test.ts"
+  ],
+  "exclude": [],
+  "$excludeNote": [
+    "MUST be empty. An extending config inherits `exclude` from the config it extends, and",
+    "the base excludes src/pipeline.ts precisely because the base cannot contain it — so this",
+    "file silently inherited an exclusion of the very files it exists to typecheck. That is",
+    "how `cycle(id, wait)` survived a passing typecheck: no pipeline file was in the program",
+    "at all. Verified with `tsc --listFiles`."
+  ]
+}

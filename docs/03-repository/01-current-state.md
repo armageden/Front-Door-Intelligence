@@ -30,7 +30,7 @@ every "does it exist yet" claim in the documentation.
 | `src/handlers/dailySummary.ts` | Lambda | Daily summary — §3.6, EventBridge-scheduled, one row per UTC date |
 | `web/src/` | Front end | `api.ts` (transport), `view.ts` (every string), `app.ts` (DOM), `main.ts` (live entry), `demo.ts` (fixture demo entry). No dependencies — decision D029 |
 | `firetv/src/` | Front end | The Fire TV overlay client: `client.ts` (state machine), `view.ts`, `app.ts` (DOM), `main.ts` (live/demo entry). No dependencies — decision D034; hosted in a WebView on Vega OS or Fire OS |
-| `test/**`, `web/test/**`, `firetv/test/**` | Test suites | 322 passing tests across 17 files |
+| `test/**`, `web/test/**`, `firetv/test/**` | Test suites | 483 passing tests across 26 files |
 
 ### Toolchain
 
@@ -49,13 +49,13 @@ every "does it exist yet" claim in the documentation.
 
 | Path | Kind |
 |---|---|
-| `prd.md` | Product requirements spec, version 1.0 — **tracked** |
+| `prd.md` | Product requirements spec, version 1.2 — **tracked** |
 | `ARCHITECTURE.md` | Technical architecture spec, version 2.0 (Corrected) — **tracked** |
 | `AGENTS.md` | Agent router and working rules |
 | `CLAUDE.md` | Pointer to `AGENTS.md` |
 | `.claude/agents/docs-updater.md` | Canonical docs-sync runbook |
 | `docs/.docsrc.json` | The docs contract — machine-readable source of truth |
-| `docs/` | 8 subject folders, 45 markdown files |
+| `docs/` | 9 subject folders, 48 markdown files |
 | `scripts/docs-check.mjs` | Documentation validator, reads the contract |
 | `scripts/build-lambda.mjs` | esbuild bundler for `src/handlers/` → `dist/` |
 | `scripts/verify-bundle.mjs` | Asserts `dist/` is self-contained |
@@ -85,7 +85,7 @@ surface is a WebView anyway (D021, D034). Still missing and required by the spec
 | Missing path | Required by |
 |---|---|
 | `firetv/App.tsx`, `firetv/components/Overlay.tsx` | `ARCHITECTURE.md` §11 — the React Native Kepler shell; cannot compile or run here, and the WebView hosting path makes it optional rather than blocking. See [08-fire-tv-overlay](../08-fire-tv-overlay/00-overview.md) |
-| `test/handlers.test.ts` | `ARCHITECTURE.md` §11 — superseded by 16 focused suites; a single combined file would be a regression, not a gap |
+| `test/handlers.test.ts` | `ARCHITECTURE.md` §11 — superseded by 18 focused suites; a single combined file would be a regression, not a gap |
 
 `template.yaml` declares **seven** Lambda functions across five source files
 (`webhookHandler.handler`, `snapshotFetcher.handler`, `overlayPusher.handler`,
@@ -159,7 +159,7 @@ unmeasured across three queue hops.
 |---|---|
 | Branch | `main` |
 | Remote | `https://github.com/armageden/Front-Door-Intelligence.git` |
-| History | Five commits, oldest first: the PRD, a docs pass, the webhook-pipeline implementation, the overlay-delivery and event-query stages, and a context change. The daily-summary, web-dashboard, demo, and firetv phases have never been committed |
+| History | Six commits, oldest first: the PRD, a docs pass, the webhook-pipeline implementation, the overlay-delivery and event-query stages, a context change, and a test pass. The daily-summary, web-dashboard, demo, and firetv phases have never been committed |
 | Working tree | Dirty: no path staged, and the overlay-delivery phase's six new files are untracked alongside roughly a dozen modifications. A count would be self-defeating here — this row is itself a modified file — so read `git status` instead |
 
 ## What this means for the documentation

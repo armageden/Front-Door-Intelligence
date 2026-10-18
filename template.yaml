@@ -83,6 +83,16 @@ Parameters:
     Type: Number
     Default: 14
     AllowedValues: [1, 3, 5, 7, 14, 30, 60, 90]
+  DashboardAllowedOrigins:
+    Type: CommaDelimitedList
+    Default: '*'
+    Description: >-
+      Origins allowed to call the HTTP API from a browser, comma separated. Set this to the
+      GitHub Pages URL once you know it, for example
+      https://armageden.github.io. The default of `*` works for a demo but means any page on
+      the internet may read GET /events/today if it somehow has the key — narrow it before
+      anything real is deployed. The WebSocket API needs no CORS; the overlay client is not
+      subject to the preflight rule.
   BedrockMonthlyBudgetUsd:
     Type: Number
     Default: 10
@@ -353,7 +363,24 @@ Resources:
     Properties:
       Name: !Sub '${AWS::StackName}-overlay-ws'
       ProtocolType: WEBSOCKET
+      # Every payload the pusher posts is a bare $3.4 message with no `action` field, so
+      # this expression routes NOTHING the pipeline sends. $connect is fine — it carries a
+      # query string, not a body, and is matched by route key rather than by expression —
+      # which is why the delivery path works today. It was, however, one client-side message
+      # away from a 403 on the socket.
       RouteSelectionExpression: '$request.body.action'
+
+  # $default catches anything that does not match, which is every frame the overlay client
+  # sends. It routes to the same handler as $disconnect: a message is not a lifecycle event,
+  # so the client ignores it and the connection is left alone. Declaring it is what turns a
+  # silent 403 into a no-op.
+  OverlayDefaultRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref OverlayWebSocketApi
+      RouteKey: $default
+      AuthorizationType: NONE
+      Target: !Sub 'integrations/${OverlayDisconnectFunction}'
 
   OverlayConnectFunction:
     Type: AWS::Serverless::Function
@@ -417,6 +444,23 @@ Resources:
       OwnershipControls:
         Rules:
           - ObjectOwnership: BucketOwnerEnforced
+      # GET on a pre-signed URL is a cross-origin fetch from the dashboard, and S3 answers
+      # without Access-Control-Allow-Origin by default. An <img> tag still paints without
+      # it, which is why this is not the same severity as the API gap — but any future
+      # canvas read, or a fetch() of the bytes rather than the element, fails on it. Cheap to
+      # declare while the bucket is being edited, and it needs no credentials because
+      # signed GET requests are unauthenticated by design.
+      CorsConfiguration:
+        CorsRules:
+          - AllowedOrigins: !Ref DashboardAllowedOrigins
+            AllowedMethods:
+              - GET
+              - HEAD
+            AllowedHeaders:
+              - '*'
+            ExposedHeaders:
+              - ETag
+            MaxAge: 300
 
   SnapshotBucketPolicy:
     Type: AWS::S3::BucketPolicy
@@ -536,10 +580,35 @@ Resources:
 
   # --- API Gateway (ARCHITECTURE.md §3.1) ---------------------------------------
 
+  # CORS is not optional here, and this was a silent omission for the whole life of the
+  # template until 2026-10-04. The dashboard is a browser app: it is published to GitHub
+  # Pages by .github/workflows/demos.yml, and it fetches an API base URL on a different
+  # origin. It also sends `X-Query-Key`, which is not a CORS-safelisted request header, so
+  # the browser issues a PREFLIGHT before the real request. With no CORS configuration the
+  # preflight gets no Access-Control-Allow-Origin and the fetch fails — while every fixture
+  # demo works perfectly, because a same-origin fixture never preflights. That is the worst
+  # possible shape for a bug: the demos you test are green and the live one is broken.
+  #
+  # AllowedOrigins is a CommaDelimitedList parameter rather than a hard-coded `*` for two
+  # reasons. A wildcard plus a custom auth header is a smell that invites a review finding;
+  # and GET /events/today returns a homeowner's door activity, so the set of pages allowed to
+  # read it is a security control that belongs to the deployer. Split on comma because that is
+  # what CommaDelimitedList produces, and allow the headers this client actually sends.
   HttpApi:
     Type: AWS::Serverless::HttpApi
     Properties:
       StageName: !Ref AWS::StackName
+      CorsConfiguration:
+        AllowOrigins: !Ref DashboardAllowedOrigins
+        AllowHeaders:
+          - Content-Type
+          - X-Query-Key
+        AllowMethods:
+          - GET
+          - OPTIONS
+        # No AllowCredentials: the API key travels in a header, not a cookie, so there is
+        # nothing to send. Adding it would restrict the wildcard case and buy nothing.
+        MaxAge: 600
 
   # --- Observability (ARCHITECTURE.md §7) ---------------------------------------
 

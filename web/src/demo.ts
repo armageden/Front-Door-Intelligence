@@ -21,7 +21,11 @@ import type { FetchLike, TodayResponse } from './api';
  */
 const SNAPSHOT_PLACEHOLDER = `data:image/svg+xml,${encodeURIComponent(
   '<svg xmlns="http://www.w3.org/2000/svg" width="320" height="180">' +
-    '<rect width="320" height="180" fill="#181d27"/>' +
+    // Deliberately NOT the panel colour. An earlier version filled this #181d27, which is
+    // exactly the card background, so the snapshot rendered as an empty box with a thin
+    // artefact in it and read as a broken image on the demo page.
+    '<rect width="320" height="180" fill="#0d1016"/>' +
+    '<rect x="0.5" y="0.5" width="319" height="179" fill="none" stroke="#2b3240"/>' +
     '<rect x="144" y="66" width="32" height="76" rx="2" fill="#2b3240"/>' +
     '<circle cx="170" cy="106" r="2.5" fill="#7fd1c1"/>' +
     '<text x="160" y="30" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" fill="#9aa4b5">demo snapshot placeholder</text>' +

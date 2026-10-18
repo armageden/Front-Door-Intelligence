@@ -10,22 +10,41 @@
   ],
   "compilerOptions": {
     "target": "ES2022",
-    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
     "module": "ESNext",
     "moduleResolution": "bundler",
     "outDir": "dist",
     "rootDir": ".",
-
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "noImplicitOverride": true,
     "noFallthroughCasesInSwitch": true,
     "exactOptionalPropertyTypes": true,
-
     "verbatimModuleSyntax": true,
     "isolatedModules": true,
     "skipLibCheck": true,
     "noEmit": true
   },
-  "include": ["src/**/*.ts", "test/**/*.ts"]
+  "include": [
+    "src/**/*.ts",
+    "test/**/*.ts"
+  ],
+  "$commentPipeline": [
+    "The pipeline demo is EXCLUDED from this config and typechecked by",
+    "web/tsconfig.pipeline.json instead. It is the one file in this tree that imports",
+    "from firetv/src, deliberately, because it mounts the real overlay client on the same",
+    "page as the real dashboard. That boundary failing to compile here is D029 working:",
+    "the two trees stay separate everywhere else."
+  ],
+  "exclude": [
+    "src/pipeline-main.ts",
+    "src/pipeline.ts",
+    "test/browserRemainder.test.ts",
+    "test/entrypoints.test.ts",
+    "test/pipeline.test.ts"
+  ]
 }

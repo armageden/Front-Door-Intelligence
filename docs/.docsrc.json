@@ -17,8 +17,8 @@
     "branch": "main",
     "shape": "single-package",
     "workspaces": [],
-    "commitCount": 5,
-    "commitCountNote": "Five commits, the last two landing the overlay-delivery and event-query stages. The daily-summary, web-dashboard, and demo phases are uncommitted — see repo shape in 03-repository/01-current-state.md. Git is read-only to agents; the human owns every commit."
+    "commitCount": 6,
+    "commitCountNote": "Six commits: the PRD, a docs pass, the webhook pipeline, the overlay-delivery and event-query stages, a context change, and a test pass. The daily-summary, web-dashboard, demo, and firetv phases are uncommitted — see repo shape in 03-repository/01-current-state.md. Git is read-only to agents; the human owns every commit."
   },
   "packageManager": {
     "detected": true,
@@ -157,7 +157,17 @@
         "test:coverage"
       ],
       "metric": "require('./coverage/coverage-summary.json').total.lines.pct",
-      "metricNote": "The first real single-number metric this repository has had, and therefore the first thing an optimisation loop could measure. The current figure is reported in docs/03-repository/03-verification-commands.md, which is where the number is re-read from coverage/coverage-summary.json after every run; this note deliberately does not duplicate it, because a stale percentage in the contract is worse than none. The uncovered remainder is dominated by default AWS-client construction in snapshotStore and connectionStore, which needs an AWS account to exercise, plus the SQS and schedule handler adapters. Those are recorded per module rather than left as a vague gap."
+      "metricNote": "The first real single-number metric this repository has had, and therefore the first thing an optimisation loop could measure. It read 99.19% lines on 2026-10-03 after a coverage phase took it from 77.45%. The remainder is reported per file by `npm run coverage:gaps` and is small and specific: one line that is unreachable by construction, and a handful of guards inside the browser entry points that cannot be reached without spinning the real demo loop on an instant clock, which hangs the worker. Branch coverage is 92.85% and is the honest number to quote — it still counts defensive `??` and early-return paths that no input reaches."
+    },
+    "coverageGaps": {
+      "status": "available",
+      "run": "npm run coverage:gaps",
+      "binary": "npm",
+      "args": [
+        "run",
+        "coverage:gaps"
+      ],
+      "note": "node scripts/coverage-gaps.mjs [file|--all]. Prints the uncovered statements of each file with their source line, so a coverage gap can be READ rather than guessed at. Exists because the suite writes coverage-summary.json (the number CI reads) and nothing else, so there was no way to ask WHICH lines were uncovered without reconfiguring the run by hand. Runs the suite itself if no JSON report is present. A reporting tool, not a gate: it has no pass/fail condition and is deliberately absent from `all` and from CI."
     },
     "typecheck": {
       "status": "available",
@@ -167,7 +177,7 @@
         "run",
         "typecheck"
       ],
-      "note": "tsc --noEmit in strict mode, covering test/ as well as src/, then two more passes over the browser surfaces, web/ and firetv/, each with a DOM lib. Three invocations because the repository targets three runtimes: the Lambda code is Node (types: [node], no DOM) and the dashboard and overlay client are browsers (DOM, no Node types). Sharing one config would let each side typecheck against the other's globals. Browser test files are typechecked on their own side, so mocks must match the real signatures. typecheck:web and typecheck:firetv exist so the second and third passes can be run on their own."
+      "note": "tsc --noEmit in strict mode, four passes. One for Node (src/ and test/), one for the dashboard (web/, browser lib, no Node types), one for the overlay client (firetv/), and a fourth for the pipeline demo alone. The repository targets two runtimes and sharing one config would let each side typecheck against the other's globals — decision D029. The fourth pass exists because web/src/pipeline.ts is the single file permitted to import across both trees: the pipeline demo mounts the real Fire TV overlay client beside the real dashboard, and web/tsconfig.pipeline.json holds it with rootDir at the repository root (D039). Every other file in web/ still cannot see firetv/. Test files are typechecked on the relevant side, so mocks must match the real signatures. typecheck:web, typecheck:pipeline and typecheck:firetv each run one pass alone."
     },
     "lint": {
       "status": "unavailable",
@@ -538,7 +548,7 @@
           "buildWeb",
           "buildFiretv"
         ],
-        "note": "Publishes the two demo pages to GitHub Pages on every push to main: web/dist/ under /dashboard/, firetv/dist/ under /overlay/, and scripts/demo-landing.html as the site root. Reads its build commands from the contract exactly like the checks workflow, per Entry 14's own suggestion. It runs no gates — checks runs them — and requires a one-time manual enable: repo settings, Pages, Source = GitHub Actions. Until that enable happens and the human pushes, the published URL does not exist; do not cite a Pages URL as live before both. Added 2026-10-04 as the durable hosting path for the demos (decision D035)."
+        "note": "Publishes the two demo pages to GitHub Pages on every push to main: scripts/stage-demos.mjs stages web/dist/ under /dashboard/, firetv/dist/ under /overlay/, and scripts/demo-landing.html as the site root — the same staging runnable locally, so the hosted experience previews without a push. Reads its build commands from the contract exactly like the checks workflow, per Entry 14's own suggestion. It runs no gates — checks runs them — and requires a one-time manual enable: repo settings, Pages, Source = GitHub Actions. Until that enable happens and the human pushes, the published URL does not exist; do not cite a Pages URL as live before both. Added 2026-10-04 as the durable hosting path for the demos (decision D035)."
       }
     ]
   },
@@ -559,6 +569,7 @@
   "limitations": [
     "This contract records discovered reality as of 2026-09-28. It is a description, not an enforcement of the build.",
     "docs-check proves document structure, not truth. It cannot confirm that a documented auth requirement, status code, parameter, or behaviour actually matches the handler, because it does not read semantics. A passing docs:check is never evidence that the docs are correct.",
+    "Neither browser tree has reverse coverage, and the globs cannot be widened to fix it: adding web/src/**/*.ts or firetv/src/**/*.ts to libGlobs would put those modules into check 5's set, which is harmless, but the same files are imported by suites the root Node tsconfig typechecks, and they would fail to compile against a runtime they do not run in. Correcting it needs new glob pairs plus an exclusion in scripts/docs-check.mjs, not a contract edit alone. Recorded as decision D036 and left open deliberately.",
     "Device names are now resolved, but never observed. src/lib/ringClient.getDevice() is called by the describe stage since decision D031, and it has still never made a real Ring request: the response shape is verified against documentation, not traffic. Nothing depends on the name being correct — a failed lookup costs the event its name and nothing else.",
     "web/ has NO reverse coverage. paths.libGlobs and paths.handlerGlobs are src/** only, so a new file under web/src/ will not fail the validator if the documentation stops naming it. The dashboard is currently documented by hand in docs/07-web-dashboard/01-dashboard.md. Widening the globs is blocked on a second problem: the root tsconfig is Node-only and the dashboard is browser-only, so a web module imported by a suite under test/ cannot resolve. Both trees are kept separate on purpose (decision D029); the globs should follow, not lead.",
     "firetv/ has the same NO-reverse-coverage gap as web/, for the same reason: it is a third typechecking tree (Node root, two browser surfaces), documented by hand in docs/08-fire-tv-overlay/. Three trees now share the pattern: the root tsconfig is Node-only, and each browser surface carries its own DOM tsconfig and its own copy of the small fake DOM.",
@@ -570,7 +581,8 @@
     "The events table is partitioned by a UTC date (D014) and GET /events/today defaults to that partition, overridable with ?date=. A homeowner's local day is not computed anywhere; the dashboard exposes the ?date= override as a date input, which is as far as local time is handled.",
     "template.yaml has never been deployed or validated. No AWS account and no SAM CLI are available, so it is checked only for YAML well-formedness and for consistency with the build output. Every Handler path is asserted to match a real file in dist/, and that is as far as verification goes.",
     "Nothing in src/lib/ringClient.ts or src/lib/bedrockClient.ts has been exercised against live AWS or Ring. There is no webhook or media simulator; the Developer Playground issues tokens and simulates live view only. Every request shape is verified against documentation, not observed traffic.",
-    "The Bedrock request envelope is the least-verified thing in the repository: no AWS documentation was fetched while writing it. It fails loudly, as an API error caught into the FR11 fallback, rather than silently.",
+    "The Bedrock request envelope is VERIFIED against the AWS Bedrock reference pages for the Anthropic Claude Messages API, fetched 2026-10-04: anthropic_version, max_tokens, messages and the base64 image block all match the documentation's own example. What that verification found and fixed: stop_reason max_tokens returns a content array that still holds text, so the parser had been storing a sentence truncated mid-word as a complete model description. It now rejects that case. Still unverified: that a real InvokeModel call succeeds, since there is no AWS account here — the remaining risk is model access and quota, not the envelope.",
+    "CORS was absent from template.yaml for the whole life of the file. The dashboard is served from GitHub Pages, fetches a different origin, and sends a non-safelisted X-Query-Key header, so the browser preflights; with no CorsConfiguration the live dashboard could not have reached a correctly deployed API while every fixture demo stayed green. Now parameterised via DashboardAllowedOrigins. Recorded as decision D037.",
     "The trigger for EncryptedMediaError is an inference, not a documented fact: Ring states TAKE/E2EE media comes back encrypted but publishes no status code or content type for it. Recorded as decision D016.",
     "The picture-in-picture overlay specified in ARCHITECTURE.md 3.4 is NOT implemented, because no documented Vega OS API supports it. The delivery half is implemented, and since D034 the client side is too — on the WebView surface Vega does sanction — but FR12, appearing over another app's playback, remains a platform limit. Recorded as decision D021.",
     "ARCHITECTURE.md §6 asks for a CloudWatch billing alarm against Bedrock cost runaway. An AWS Budget filtered to the Bedrock service is declared instead, because EstimatedCharges must be enabled per account from the Billing console and a template cannot do that. Recorded as decision D027. The budget has never been created and no notification has ever been sent.",

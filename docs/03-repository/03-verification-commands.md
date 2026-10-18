@@ -1,6 +1,6 @@
 **Back:** [00-overview](./00-overview.md)
 
-**Verified against:** `package.json` read in full; `scripts/docs-check.mjs` and `.github/workflows/docs-check.yml` both read in full; every command below executed on 2026-10-04, including `npm run test:coverage`, whose `coverage/coverage-summary.json` supplied the 83.85% figure and every per-file percentage quoted below; `template.yaml` additionally parsed with a Python duplicate-key detector, which is how two pre-existing duplicate keys in the `QueryApiKey` parameter were found; `git config --get core.hooksPath` confirmed unset, and the repository's git hooks directory confirmed to hold no hook file.
+**Verified against:** `package.json` read in full; `scripts/docs-check.mjs` and `.github/workflows/docs-check.yml` both read in full; every command below executed on 2026-10-04, including `npm run test:coverage`, whose `coverage/coverage-summary.json` supplied the 99.19% figure and every per-file percentage quoted below; `template.yaml` additionally parsed with a Python duplicate-key detector, which is how two pre-existing duplicate keys in the `QueryApiKey` parameter were found; `git config --get core.hooksPath` confirmed unset, and the repository's git hooks directory confirmed to hold no hook file.
 
 <!-- docs-check:expect-absent .githooks .husky .lintstagedrc lefthook.yml .pre-commit-config.yaml test/handlers.test.ts -->
 
@@ -17,7 +17,7 @@ added by the firetv phase, which made it three.
 |---|---|---|
 | **everything** | `npm run all` | typecheck → test → build → build:verify → build:web → build:firetv → docs:check, in order. The local pre-commit substitute, and step-for-step the same sequence CI runs |
 | **docs:check** | `npm run docs:check` | Validates documentation structure against the contract. Exits 1 on any failure |
-| **typecheck** | `npm run typecheck` | `tsc --noEmit` three times, strict. Once for Node (`src/`, `test/`) and once for each browser surface (`web/`, `firetv/`). Exits 1 on any type error |
+| **typecheck** | `npm run typecheck` | `tsc --noEmit` four times, strict. Node (`src/`, `test/`), each browser surface (`web/`, `firetv/`), and the pipeline demo alone — the one file permitted to import across both trees. Exits 1 on any type error |
 | **test** | `npm test` | `vitest run`. Discovers `test/**/*.test.ts`, `web/test/**/*.test.ts`, and `firetv/test/**/*.test.ts`. Exits 1 on any failure |
 | **test:coverage** | `npm run test:coverage` | Tests plus a v8 coverage report to `coverage/` |
 | **build** | `npm run build` | `node scripts/build-lambda.mjs` — esbuild bundles each handler into a self-contained CommonJS file in `dist/` |
@@ -41,6 +41,24 @@ These are recorded as `unavailable` rather than given plausible commands. A comm
 that cannot run is worse than a documented gap, because it gets copied into CI and
 fails there instead of failing here.
 
+### Verify a new tsconfig actually checks something
+
+An **extending config inherits `exclude` as well as `include`**, and nothing warns you when
+the result is empty. `web/tsconfig.pipeline.json` extends `web/tsconfig.json` — which excludes
+`web/src/pipeline.ts`, precisely because the base config cannot contain a cross-tree import. The
+extending config therefore inherited an exclusion of the very files it existed to check, and
+`npm run typecheck` printed a clean run of an empty program for as long as it took to notice.
+
+**Check it once, when you create the config:**
+
+```bash
+npx tsc --noEmit -p web/tsconfig.pipeline.json --listFiles | grep -c 'src/pipeline'
+```
+
+A `0` means the config is checking nothing while reporting success — which is worse than having
+no typecheck, because it is a green light with nothing behind it. This is Friction Log
+Entry 25, and `web/tsconfig.pipeline.json` now sets `"exclude": []` with a note saying why.
+
 ## The one real metric
 
 `npm run test:coverage` writes `coverage/coverage-summary.json`, whose
@@ -51,42 +69,59 @@ npm run test:coverage --silent >/dev/null 2>&1
 node -p "require('./coverage/coverage-summary.json').total.lines.pct"
 ```
 
-It read **100** when the first module was under test, in well under a second. It read
-**83.78** on 2026-10-03, and **83.85** on 2026-10-04, across 17 test files covering all
-five backend stages, both browser surfaces, and their demo entry points.
+It read **99.19** on 2026-10-03, across 26 test files. It was **77.45** before the coverage
+phase, which is worth remembering: the two numbers described almost the same repository,
+and the difference was 159 tests concentrated on code that only ever runs in production.
 
-This matters beyond reporting: it is the first genuinely mechanical metric this
-repository has had, and therefore the first thing an autonomous optimisation loop could
-measure. It was briefly at its ceiling, which made it useless as a target; it is now
-below it again, which makes it meaningful. The four lowest-covered files are the least
-happy, and for the same reason: `src/handlers/overlayPusher.ts` at 55.76%,
-`src/handlers/snapshotFetcher.ts` at 59.42%, `src/lib/snapshotStore.ts` at 70.58%, and
-`src/lib/connectionStore.ts` at 76.92%. Their uncovered lines are default AWS-client
-construction and the SQS and WebSocket route plumbing — paths that need a real account to
-exercise.
+**Four metrics, and only one of them is close to complete.**
 
-The pure modules are at **100%**: `src/lib/daySummary.ts`, `src/lib/signatureVerifier.ts`,
-`web/src/api.ts`, `web/src/view.ts`, `firetv/src/app.ts`, and `firetv/src/view.ts`. That is the
-clearest evidence of what the number actually measures. The query stage is the
-counter-example at the other end: `src/handlers/eventQuery.ts` landed at 95% in one pass,
-because a pure response-mapping function and an injected dependency seam have nothing left
-to hide. Coverage tracks how much of a file is AWS or DOM plumbing, not how good the code
-is.
+| Metric | Value | What it means here |
+|---|---|---|
+| lines | **99.19** | 13 statements short, all accounted for below |
+| statements | 98.63 | the same statements |
+| functions | 98.23 | every default factory is now invoked |
+| **branches** | **92.85** | **the honest one to quote** |
 
-`src/handlers/dailySummary.ts` sits at **82.50%**, and its uncovered lines are the handler
-adapter — the part that builds its own DynamoDB and Bedrock clients, exactly like the SQS
-handlers above it. The whole decision tree is covered through `generateDaySummary` with
-injected dependencies.
+Branch coverage is lower because it counts defensive paths no input reaches — a `??`, an
+early return, a guard against a null. Lines went to 99% without those being exercised, which
+is exactly why quoting lines alone would overstate what is known.
 
-**The dashboard is the clearest case in the repository.** `web/src/app.ts` reads 83% against
-a hand-written fake DOM, and every other dashboard module is at 100%. Its logic is fully
-covered; its *rendering* is not covered at all, because no browser exists here. That
-distinction is the point — a single percentage for that file would have hidden which half
-is verified, and the per-file numbers do not.
+### What the last 0.81% is
 
-**Coverage is a floor, not a verdict.** 83.78% of lines executed says nothing about
-whether the assertions match the real Ring or Bedrock APIs, because every external call
-is a fake.
+`npm run coverage:gaps` prints it per file, with the source line, so the claim is checkable
+rather than asserted:
+
+```bash
+npm run coverage:gaps                      # every file with a gap
+npm run coverage:gaps src/lib/ringClient.ts
+```
+
+Three groups, and none of them is "work nobody got to":
+
+1. **One line that cannot execute.** `requireEnv` in two handlers is reached only through
+   `modelId ?? requireEnv(BEDROCK_MODEL_ID)`, which calls it when `modelId` is nullish —
+   and it always throws there. Its `return value` is dead by construction. Reaching 100%
+   would have meant changing working code to satisfy a tool.
+2. **Guards inside the two browser entry points.** Reaching them means running the real demo
+   loop on an instant clock, which spins forever in microtasks and hangs the worker. The
+   alternative — injecting the clock — is what `runLoop()` already does for the part worth
+   testing, and the rest is wiring a browser exercises better than a fake does.
+3. **Two `close()` callbacks and a reconnect timer**, which need a live socket to close.
+
+### What coverage found that a percentage would not have
+
+The work produced three findings none of which is a coverage number, and all three are
+recorded where they belong — Friction Log Entry 25 for the first, and decision D040 for the set:
+
+- A whole test file was being typechecked by **no configuration at all** (Entry 25).
+- A test helper failed the entire suite while all 483 of its tests passed, via an
+  unhandled rejection that surfaced against unrelated code.
+- Two handlers contain a line unreachable by construction.
+
+**Coverage is still a floor and not a verdict.** Of the three defects found in this
+repository that coverage could not see — an eight-second blank first card, an invisible
+snapshot, a demo that froze after seventeen seconds — **none would have been caught by
+reaching 100%.** Every one was found by opening the page.
 
 ## The nine checks
 

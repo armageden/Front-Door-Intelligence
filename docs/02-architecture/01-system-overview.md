@@ -62,9 +62,10 @@ Partner API sends only a coarse `sub_type` inside `data.attributes` — there ar
 bounding boxes and no object labels. The webhook handler must normalise the payload into
 a structured event object before passing it downstream.
 
-**One app, one primary track.** `ARCHITECTURE.md` §3.7 makes Alexa+ and Bee optional
-adapters within the Ring entry, never separate track entries. This is restated in the
-requirements subject at
+**Two primary tracks, Ring and Fire TV.** Nothing in the Rules limits how many tracks a project
+may *enter*; §8 caps only the prizes a project may *win*. `ARCHITECTURE.md` §3.7 states the rule
+with the quote. Alexa+ and Bee remain out of scope as entries, which is what keeps FR16 and FR17
+honestly scoped as MAY — see
 [01-requirements-index](../01-product/01-requirements-index.md#54-optional-cross-track-integration).
 
 ## Related

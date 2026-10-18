@@ -4,11 +4,11 @@
 |---|---|
 | **Project Name** | Front Door Intelligence |
 | **Hackathon** | Build, Ship, Shape: Amazon Developer Hackathon 2026 |
-| **Primary Track** | Ring |
+| **Primary Track** | Ring, Fire TV |
 | **Mini-Challenges** | AWS Builder, Open Source |
-| **Version** | 1.0 |
-| **Author** | [Your Name] |
-| **Date** | September 28, 2026 |
+| **Version** | 1.2 |
+| **Author** | farhan |
+| **Date** | October 16, 2026 |
 | **Deadline** | October 24, 2026 (3:00 AM GMT+8) |
 
 ---
@@ -17,7 +17,9 @@
 
 | Date | Version | Description | Author |
 |---|---|---|---|
-| 2026-09-28 | 1.0 | Initial PRD created | [Your Name] |
+| 2026-09-28 | 1.0 | Initial PRD created | farhan |
+| 2026-10-16 | 1.1 | Corrected against the Devpost Official Rules: FR3 subtype values (flat, not dotted), NFR1/NFR4/NFR6 citations, private-repo constraint (private repos are judgeable), Vega OS testing constraint (emulator sufficient). All six dead `[reference:N]` markers removed. Evidence: `docs/05-hackathon-requirements/03-doc-conflicts.md`. | farhan |
+| 2026-10-16 | 1.2 | Primary Track set to **Ring, Fire TV**, re-verified against the live Rules: §4 imposes no entry limit and §8 caps only prizes *won*. Goals §2 and Background §3 updated to match. Evidence: `docs/05-hackathon-requirements/03-doc-conflicts.md` conflict 2. | farhan |
 
 ---
 
@@ -26,7 +28,7 @@
 - Transform raw Ring motion events into contextual, one-sentence AI descriptions delivered to the TV screen without interrupting viewing.
 - Reduce the cognitive load of checking a phone for every doorbell/motion notification.
 - Demonstrate a working, end-to-end pipeline using Ring APIs, AWS Bedrock, and Fire TV overlay — all live, no mocked data in the final demo.
-- Win the Ring primary track and qualify for both mini-challenges (AWS Builder + Open Source).
+- Enter the **Ring** and **Fire TV** primary tracks — only one track prize can be won, but both may be entered (Rules §8) — and qualify for both mini-challenges (AWS Builder + Open Source).
 - Earn the 10% Friction Log bonus by documenting every tooling friction point.
 
 ---
@@ -37,7 +39,7 @@ Every smart home generates a flood of raw alerts: "Motion detected at Front Door
 
 **Front Door Intelligence** solves this by inserting an AI reasoning layer between the Ring event and the human. Instead of a raw motion ping, the user receives a natural-language description — "Amazon delivery driver placed a medium box" — displayed as a non-intrusive picture-in-picture overlay on their Fire TV. The system understands *what happened*, not just *that something moved*.
 
-The Amazon Developer Hackathon is the first time Ring, Fire TV, Alexa+, and Bee have been opened to external developers simultaneously. This project targets the **Ring** primary track (priority category: **access control** and **caretaking**) while integrating AWS Bedrock for the **AWS Builder** mini-challenge and shipping as open source for the **Open Source** mini-challenge.
+The Amazon Developer Hackathon is the first time Ring, Fire TV, Alexa+, and Bee have been opened to external developers simultaneously. This project targets the **Ring** primary track (priority category: **access control** and **caretaking**) and the **Fire TV** primary track, while integrating AWS Bedrock for the **AWS Builder** mini-challenge and shipping as open source for the **Open Source** mini-challenge.
 
 ---
 
@@ -58,7 +60,11 @@ The Amazon Developer Hackathon is the first time Ring, Fire TV, Alexa+, and Bee 
 
 - **FR1:** The system MUST receive Ring webhook events in real time via HTTP POST.
 - **FR2:** The system MUST verify the `X-Signature` HMAC-SHA256 header on every incoming webhook request.
-- **FR3:** The system MUST extract the event subtype (`motion.human`, `motion.vehicle`, `motion.other_motion`, `button_press`) from `data.attributes`[reference:0].
+- **FR3:** The system MUST extract the event subtype from `data.attributes.sub_type`, whose
+  documented values are **flat**: `motion`, `human`, `vehicle`, `other_motion`. The dotted forms
+  (`motion.human`) belong to the Event History **query parameter**, a different API surface, and
+  match nothing on the webhook. `button_press` is an event `type`, not a subtype (Ring Partner API
+  documentation).
 - **FR4:** For person/motion events, the system MUST request a camera snapshot via the Ring Partner API within 5 seconds of receiving the webhook.
 - **FR5:** The system MUST send the snapshot to Amazon Bedrock (Claude or Nova) for a one-sentence natural-language description.
 - **FR6:** The system MUST deliver the description + snapshot to a Fire TV overlay within 8 seconds of the original event.
@@ -91,12 +97,16 @@ The Amazon Developer Hackathon is the first time Ring, Fire TV, Alexa+, and Bee 
 
 ## 6. Non-Functional Requirements
 
-- **NFR1:** Webhook endpoint MUST return HTTP 200 within 5 seconds to avoid Ring retry storms[reference:1].
+- **NFR1:** Webhook endpoint MUST return HTTP 200 within 5 seconds. The Ring documentation names
+  inline heavy processing as a Common Mistake because it exceeds the 5-second response budget and
+  produces duplicates, so the target is the documentation's own, not an invented SLA.
 - **NFR2:** Webhook handling MUST be idempotent — duplicate `request_id` values MUST not create duplicate events.
 - **NFR3:** All API keys and tokens MUST be stored as environment variables, never committed to the repository.
-- **NFR4:** The public GitHub repository MUST include an MIT License visible in the About section[reference:2].
+- **NFR4:** The public GitHub repository MUST include an MIT License, detectable and visible in
+  the About section (Rules §4, submission requirement 5).
 - **NFR5:** The README MUST include complete setup instructions so judges can run the project locally.
-- **NFR6:** The demo video MUST be under 3 minutes, leading with the user problem before the solution[reference:3].
+- **NFR6:** The demo video MUST be under 3 minutes, publicly visible on YouTube or Vimeo, and show
+  the project functioning on the target device (Rules §4, submission requirement 7).
 - **NFR7:** Total AWS resource usage SHOULD stay within free-tier limits where feasible.
 
 ---
@@ -153,9 +163,14 @@ The Amazon Developer Hackathon is the first time Ring, Fire TV, Alexa+, and Bee 
 
 - **Time:** ~26 days to deadline (October 24, 2026).
 - **Solo developer:** No team; must prioritize ruthlessly.
-- **Ring physical device:** Not required; simulators acceptable[reference:4].
-- **Public repo:** Mandatory; private repos are not judgeable.
-- **Vega OS testing:** Requires a physical Fire TV Stick running Vega OS or a virtual device[reference:5].
+- **Ring physical device:** Not required; simulators are explicitly accepted (Rules §4).
+- **Public repo:** Publishing publicly is the plan. Rules §4 permits either a public open-source
+  repo **or** a private repo shared with `testing@devpost.com` and the Amazon team — private
+  repos are judgeable. Public remains the choice because it is simpler and it also serves the
+  Open Source mini-challenge. Note that reviewer invitations expire after **7 days**, so if the
+  private route were ever taken, collaborators should be added near submission time.
+- **Vega OS testing:** An emulator or simulator is sufficient at every stage of submission and
+  judging; a physical Fire TV Stick is **not** required (FAQs).
 
 ---
 
@@ -188,7 +203,7 @@ Document the following categories with specific examples:
 - [ ] Public GitHub repo with MIT License in About section
 - [ ] README with setup instructions and environment variable template
 - [ ] Demo video < 3 minutes (uploaded to YouTube/Vimeo, public)
-- [ ] Devpost submission form filled (track: Ring)
+- [ ] Devpost submission form filled (tracks: Ring, Fire TV)
 - [ ] Friction Log in repo root (`FRICTION_LOG.md`)
 - [ ] Working demo accessible to judges
 - [ ] AWS Builder mini-challenge: documented Bedrock integration

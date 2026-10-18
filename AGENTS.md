@@ -30,7 +30,7 @@ Specified in `prd.md` and `ARCHITECTURE.md`.
 | **Language** | TypeScript `^7.0.2`, strict, ES2022, CommonJS output |
 | **Framework** | AWS serverless — Lambda, API Gateway, DynamoDB, S3, SQS, EventBridge, Budgets, Bedrock, via SAM. Never deployed. Dashboard is plain TypeScript, no framework — decision D029. |
 | **Package manager** | **npm** (12.1.0), lockfile `package-lock.json`. Chosen because `ARCHITECTURE.md` §9.1 specifies `npm install`, and npm resolves workspaces natively for the planned `firetv/` and `web/` packages. |
-| **Repo shape** | Two trees, one package. `web/` has its own `package.json` (no dependencies) but is **not** an npm workspace — `npm ci` fails on a lockfile that does not record one, and installs do not work here. Decision D030. |
+| **Repo shape** | Three trees, one package. `web/` and `firetv/` each have a `package.json` declaring **no dependencies**, and neither is an npm workspace — `npm ci` fails on a lockfile that does not record one, and installs do not work here. Decision D030. |
 | **Runtimes available** | Node v22.23.3, npm 12.1.0, pnpm 11.13.1, Yarn 1.22.22. Bun is not installed. The project requires Node `>=20`. |
 
 ### Commands
@@ -42,13 +42,14 @@ pass**; the three marked unavailable below cannot run here at all.
 |---|---|---|
 | **everything** | `npm run all` | typecheck + test + build + build:verify + build:web + build:firetv + docs:check, in order |
 | **docs:check** | `npm run docs:check` | available |
-| **typecheck** | `npm run typecheck` | available — `tsc --noEmit` **three times**: Node for `src/`+`test/`, browser for `web/` and `firetv/` |
-| **test** | `npm test` | available — vitest, 322 tests across 17 files, over three test trees |
-| **test:coverage** | `npm run test:coverage` | available — the only mechanical metric in the repo. 83.85% on 2026-10-04 |
+| **typecheck** | `npm run typecheck` | available — `tsc --noEmit` **four times**: Node for `src/`+`test/`, browser for `web/` and `firetv/`, and the pipeline demo alone (the one file permitted to cross both trees — D039) |
+| **test** | `npm test` | available — vitest, 483 tests across 26 files, over three test trees |
+| **test:coverage** | `npm run test:coverage` | available — the only mechanical metric in the repo. 99.19% lines on 2026-10-03 |
 | **build** | `npm run build` | available — esbuild bundles each handler into `dist/` |
 | **build:web** | `npm run build:web` | available — esbuild bundles `web/src/` into `web/dist/` |
 | **build:firetv** | `npm run build:firetv` | available — esbuild bundles `firetv/src/` into `firetv/dist/` |
 | **build:verify** | `npm run build:verify` | available — asserts `dist/` is self-contained |
+| **coverage:gaps** | `npm run coverage:gaps` | available — prints uncovered statements per file. A reporting tool, not a gate |
 | dev | — | unavailable: no SAM CLI, no `sam local start-api` |
 | lint | — | unavailable: no linter, by choice — see decision D011 |
 | format | — | unavailable: no formatter |
@@ -66,7 +67,7 @@ subject's `order`; the validator fails otherwise.
 |---|---|---|
 | [`docs/00-how-to/`](./docs/00-how-to/00-overview.md) | Task-first recipes for this repo's recurring change types | **Doing a task? Start here.** Match your change to a recipe. |
 | [`docs/01-product/`](./docs/01-product/00-overview.md) | FR1–FR18, NFR1–NFR7, success metrics, submission checklist | You need to know what the product must do, or which requirement ID to cite |
-| [`docs/02-architecture/`](./docs/02-architecture/00-overview.md) | Pipeline design, API contracts, data store, security, decisions D001–D031 | You need the design intent or the reasoning behind a decision |
+| [`docs/02-architecture/`](./docs/02-architecture/00-overview.md) | Pipeline design, API contracts, data store, security, decisions D001–D041 | You need the design intent or the reasoning behind a decision |
 | [`docs/03-repository/`](./docs/03-repository/00-overview.md) | What exists on disk, the toolchain, check commands, the planned structure | **Before you assume any file, script, or command exists** |
 | [`docs/04-libraries/`](./docs/04-libraries/00-overview.md) | Real exported APIs of the eight modules under `src/lib/` | You need a module's actual signature, return shape, or failure modes |
 | [`docs/05-hackathon-requirements/`](./docs/05-hackathon-requirements/00-overview.md) | The Devpost rules, the Ring API, the resource leads, and where the project docs conflict with both | You need to know what is worth points, whether a document makes a claim the sources do not support, or where the tooling and samples are |

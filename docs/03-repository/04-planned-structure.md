@@ -137,7 +137,7 @@ documentation set resolves them:
 | Planned | Actual | Resolution |
 |---|---|---|
 | `docs/PRD.md`, `docs/ARCHITECTURE.md`, `docs/FRICTION_LOG.md` | `prd.md` and `ARCHITECTURE.md` live at the repo root | The specs stay at the root. `docs/` holds the navigable subject folders instead of copies, so there is one source of truth per fact |
-| `FRICTION_LOG.md` at repo root | Written — 20 entries in the six-field shape the Official Rules require | Satisfied. The Rules' schema wins over the four-field template in `ARCHITECTURE.md` §10, since Rules §11.4 makes them controlling |
+| `FRICTION_LOG.md` at repo root | Written — 27 entries in the six-field shape the Official Rules require | Satisfied. The Rules' schema wins over the four-field template in `ARCHITECTURE.md` §10, since Rules §11.4 makes them controlling |
 
 The spec also has no entry for `scripts/`, which now holds
 `scripts/docs-check.mjs`, `scripts/build-lambda.mjs`, and `scripts/verify-bundle.mjs`,

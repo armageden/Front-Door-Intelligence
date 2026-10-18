@@ -46,9 +46,9 @@ FR9/FR10 is quoted in
 | ID | Requirement | Status |
 |---|---|---|
 | FR12 | The overlay MUST appear as picture-in-picture without stopping the currently playing content | **Not implementable as written** — no documented Vega OS API supports a system-level overlay. The delivery half is built; decision D021 |
-| FR13 | The overlay MUST include: snapshot thumbnail, one-sentence description, timestamp, and a dismiss button | **Partly** — the payload carries `snapshot_url`, `description`, and `timestamp`; the dismiss button needs a client that does not exist |
-| FR14 | The overlay MUST auto-dismiss after 15 seconds if not interacted with | Not implementable as written — `useToastKepler` is text-and-icon with a fixed SHORT or LONG duration, and cannot express 15 seconds |
-| FR15 | The overlay MUST work on Fire TV Stick 4K Select running Vega OS | Not implemented — no `firetv/` directory exists at all |
+| FR13 | The overlay MUST include: snapshot thumbnail, one-sentence description, timestamp, and a dismiss button | **Implemented** — the §3.4 payload carries all four, and the `firetv/` client renders them with a working dismiss. The rendering is verified only in a browser, never on a television |
+| FR14 | The overlay MUST auto-dismiss after 15 seconds if not interacted with | **Implemented in the client** — `DEFAULT_AUTO_DISMISS_MS = 15_000`, watched live in a browser. Vega's own `useToastKepler` cannot express 15s, which is why the overlay is a WebView page rather than a Kepler toast — see D021 and D034 |
+| FR15 | The overlay MUST work on Fire TV Stick 4K Select running Vega OS | **Client written, never run on a device.** `firetv/` is a dependency-free page that runs in any browser and is designed to load in the `@amazon-devices/webview` Vega documents — but no Vega device has executed it. D034 |
 
 FR12 is the constraint that shapes the Fire TV app design: no playback interruption.
 See [01-system-overview](../02-architecture/01-system-overview.md) for why the
@@ -56,9 +56,10 @@ WebSocket API is the push mechanism, and
 [05-fire-tv-vega-findings](../05-hackathon-requirements/05-fire-tv-vega-findings.md)
 for the API survey behind FR12 and FR14.
 
-**FR12 and FR14 are the two requirements this project cannot satisfy as written.** Both
-blockers are platform limits, not engineering effort, and both were confirmed against
-all 38 documented Vega APIs rather than assumed. That is a finding to raise with the
+**FR12 is the one requirement this project cannot satisfy as written.** The blocker is a
+platform limit, not engineering effort, and it was confirmed against all 38 documented
+Vega APIs rather than assumed. FR14 was on this list until D034 retired it — the 15-second
+auto-dismiss is implemented in the `firetv/` client. That is one finding to raise with the
 judges, not a gap to quietly ship around.
 
 ## 5.4 Optional cross-track integration
@@ -68,15 +69,17 @@ judges, not a gap to quietly ship around.
 | FR16 | *[Optional]* An Alexa+ MCP server endpoint MAY expose a `get_latest_door_event` tool for voice queries | Optional, not implemented |
 | FR17 | *[Optional]* Bee data MAY trigger a "check front door" reminder when the user arrives home | Optional, not implemented |
 
-Both use MAY, not MUST. The PRD and `ARCHITECTURE.md` §3.7 both state the governing
-rule: one app can only be entered into **one** primary track, so these are supporting
-adapters inside the Ring entry, never separate submissions.
+Both use MAY, not MUST. `ARCHITECTURE.md` §3.7 records why Alexa+ and Bee remain out of scope
+as entries: nothing in the Rules limits how many tracks a project may *enter* (only the prizes it
+may *win*), but this project enters **Ring and Fire TV**, where both halves are already built.
+FR16 and FR17 are therefore scoped as MAY supporting integrations, never separate submissions —
+a scoping choice, not a rule.
 
 ## 5.5 Friction Log
 
 | ID | Requirement | Status |
 |---|---|---|
-| FR18 | MUST include a `FRICTION_LOG.md` documenting every tooling error, outdated doc, and broken dependency encountered | **Implemented** — 20 entries across all five `prd.md` §12 categories, in the six-field shape Rules §6 requires. Worth up to a recommended 10% Stage One bonus |
+| FR18 | MUST include a `FRICTION_LOG.md` documenting every tooling error, outdated doc, and broken dependency encountered | **Implemented** — 27 entries across all five `prd.md` §12 categories, in the six-field shape Rules §6 requires. Worth up to a recommended 10% Stage One bonus |
 
 FR18 is the only requirement with a named deliverable file that is missing from the
 repo root. The template it must follow is in

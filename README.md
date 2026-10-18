@@ -2,7 +2,8 @@
 
 **A Ring doorbell press becomes one sentence of plain English on your TV.**
 
-Amazon Developer Hackathon 2026 — Ring track, with the AWS Builder mini-challenge.
+Amazon Developer Hackathon 2026 — Ring and Fire TV tracks, with the AWS Builder and Open
+Source mini-challenges.
 
 When someone rings your doorbell or walks past the camera, an AI model looks at the
 snapshot and writes one sentence — *"A delivery driver places a medium box by the door"* —
@@ -25,26 +26,34 @@ and no Vega or Fire OS shell has ever run.**
 | Daily summary | FR7's second half | implemented, tested against fakes. No SES email |
 | Web dashboard (`web/`) | the client for FR8 | implemented, 50 tests. Plain TypeScript, not React — decision D029. **Rendered in a real browser** |
 | Fire TV overlay (`firetv/`) | the client for FR6, FR13, FR14 | implemented, 20 tests. The §3.4 payload over the Overlay WebSocket, 15-second auto-dismiss, D-pad-reachable dismiss. Plain TypeScript in the WebView Vega sanctions — decision D034. **Rendered in a real browser** |
-| Demo pages (`web/dist/demo.html`, `firetv/dist/overlay.html`) | judges, without a deployment | fixture data through the production code — no backend needed |
+| Demo pages (`web/dist/pipeline.html`, `demo.html`, `firetv/dist/overlay.html`) | judges, without a deployment | fixture data through the production clients — no backend needed |
 
-**You can see both front ends right now, without deploying anything:**
+**You can see both front ends right now, without deploying anything.** Start with
+`web/dist/pipeline.html`: it runs all five stages and shows the real overlay client beside
+the real dashboard, wired to one fixture stream so they cannot disagree — including the
+moment an event appears in the timeline *before* its sentence exists.
 
 ```bash
 npm run build:web && npm run build:firetv
 # serve each dist/ with any static file server, then open:
+#   web/dist/pipeline.html — START HERE: the whole chain, both screens at once
 #   web/dist/demo.html     — the homeowner's day (fixture data)
-#   firetv/dist/overlay.html — the TV overlay (fixture pushes, auto-dismiss at 15s)
+#   firetv/dist/overlay.html — the TV overlay alone (fixture pushes, auto-dismiss at 15s)
 npx serve web/dist
 npx serve firetv/dist
+# or preview the combined hosted site exactly as GitHub Pages serves it:
+node scripts/stage-demos.mjs && npx serve site   # landing page at the root
 ```
 
 **And a hosted copy publishes itself from this repository.** `.github/workflows/demos.yml`
-publishes both demos to GitHub Pages on every push to `main` — a landing page, the overlay
-under `/overlay/`, and the dashboard under `/dashboard/`. One manual enable is required
+publishes both demos to GitHub Pages on every push to `main` — `scripts/stage-demos.mjs`
+stages a landing page with the overlay under `/overlay/` and the dashboard under
+`/dashboard/`. The landing page's links are relative to that staged root, so opening
+`scripts/demo-landing.html` straight from the repository 404s by design — stage first. One manual enable is required
 the first time (Settings → Pages → Source: "GitHub Actions"); after that every push
 republishes. The build commands come from the docs contract, so the workflow cannot drift.
 
-Both demos render fixture data through the same code the live pages run — the dashboard's
+Every demo renders fixture data through the same code the live pages run — the dashboard's
 `load()`, the overlay's `start()` — with only the transport faked. A banner says the data
 is a fixture. Add `?endpoint=…` to either page to point it at a real deployment.
 
@@ -54,7 +63,7 @@ overlay's 15-second auto-dismiss and dismiss button, all watched live. All five 
 stages are written, including the daily summary (`ARCHITECTURE.md` §3.6), which is the one
 stage triggered by a clock rather than by Ring or a queue.
 
-**Three requirements are not implementable as written** on Vega OS — the
+**One requirement is not implementable as written** on Vega OS — the
 picture-in-picture overlay (FR12) above another app's playback, which has no documented API
 at all. FR13 and FR14 are implemented on the surface Vega does sanction (a transparent
 WebView); FR12 alone remains a platform limit, verified against all 38 documented Vega
@@ -62,7 +71,7 @@ APIs. The Fire TV track's **Fire OS** option has documented heads-up notificatio
 float over content; see [Entry 6 of the Friction Log](./FRICTION_LOG.md) and decision D021.
 
 **Nothing in this repository has ever run against Ring or AWS.** There is no webhook
-sandbox (Friction Log Entry 3), so all 322 tests exercise real logic against injected
+sandbox (Friction Log Entry 3), so all 483 tests exercise real logic against injected
 fakes. Every request shape is verified against documentation, not observed traffic.
 
 ---
@@ -113,9 +122,10 @@ clean checkout. All seven steps pass; CI runs the identical sequence.
 | Command | What it does |
 |---|---|
 | `npm run all` | every gate, in order, including the build both bundle gates depend on |
-| `npm test` | 322 tests across 17 files (vitest) |
-| `npm run test:coverage` | tests + line coverage (83.8%) |
-| `npm run typecheck` | `tsc --noEmit` three times, strict — Node, then each browser surface |
+| `npm test` | 483 tests across 26 files (vitest) |
+| `npm run test:coverage` | tests + line coverage (99.2% lines, 92.9% branches) |
+| `npm run coverage:gaps` | prints the uncovered statements per file, with source |
+| `npm run typecheck` | `tsc --noEmit` four times, strict — Node, each browser surface, and the pipeline demo |
 | `npm run build` | esbuild bundles each handler into `dist/` |
 | `npm run build:web` | esbuild bundles the dashboard into `web/dist/` |
 | `npm run build:firetv` | esbuild bundles the overlay client into `firetv/dist/` |
@@ -202,10 +212,11 @@ web/
 firetv/
   src/         client · view · app · main — the §3.4 overlay, no dependencies
   test/        overlay tests
-test/           12 suites on the Lambda side — 17 files with web/test and firetv/test,
-                318 tests, no network access
-docs/           8 subject folders — the documentation set has its own contract
+test/           18 suites on the Lambda side — 26 files with web/test and firetv/test,
+                483 tests, no network access
+docs/           9 subject folders — the documentation set has its own contract
 scripts/        docs-check · build-lambda · verify-bundle · build-web · build-firetv
+                · coverage-gaps · stage-demos
 template.yaml  AWS SAM template
 ```
 
@@ -241,7 +252,7 @@ Full detail: [`docs/05-hackathon-requirements/`](./docs/05-hackathon-requirement
 
 ## Friction Log
 
-[`FRICTION_LOG.md`](./FRICTION_LOG.md) records **20** specific, actionable obstacles across
+[`FRICTION_LOG.md`](./FRICTION_LOG.md) records **27** specific, actionable obstacles across
 Ring API, Vega SDK, Bedrock, AWS setup, and documentation — each with the workaround used
 and an upstream suggestion. Targets the 10% judging bonus.
 

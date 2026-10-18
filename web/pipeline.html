@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Front Door Intelligence — the whole chain</title>
+    <!--
+      The pipeline demo. Both surfaces below are the production clients; only the transport
+      is a fixture. Staged to /dashboard/pipeline.html by scripts/stage-demos.mjs.
+    -->
+    <link rel="stylesheet" href="./app.css" />
+    <link rel="stylesheet" href="./overlay.css" />
+    <link rel="stylesheet" href="./pipeline.css" />
+  </head>
+  <body class="pipeline-page">
+    <p class="banner">
+      Demo — fixture events through the production clients. Nothing happened at a real front
+      door, and no stage below was timed from a real system.
+    </p>
+
+    <main>
+      <h1>One press, one sentence, two screens</h1>
+      <p class="lede">
+        Each event walks the chain left to right. The television is the Fire TV overlay and the
+        timeline is the dashboard — the same two clients the repository ships, wired to one
+        fixture stream so they cannot disagree. Watch the timeline entry appear
+        <em>before</em> its sentence: that gap is real. The webhook answers in under five
+        seconds and the description arrives from a queue afterwards.
+      </p>
+
+      <div class="stage-bar">
+        <ol id="stages" class="stages" aria-label="Pipeline stages"></ol>
+        <!--
+          The sequence loops, so this is for a judge who wants it again rather than for
+          someone watching for the first time.
+        -->
+        <button id="replay" type="button">Replay</button>
+      </div>
+
+      <div class="surfaces">
+        <section class="surface surface--tv">
+          <h2>On the television</h2>
+          <!--
+            The id MUST be "overlay" and the tag MUST be <main>. firetv/overlay.css targets
+            #overlay for its centring, padding, and column layout, so a differently-named
+            mount point silently loses every one of those rules — which is exactly what
+            happened on the first attempt and why the card overflowed its pane.
+            This page does not reimplement the overlay; it mounts the real client.
+          -->
+          <div class="tv-screen"><main id="overlay"></main></div>
+        </section>
+
+        <section class="surface surface--dashboard">
+          <h2>In the dashboard</h2>
+          <div id="app" class="dashboard-pane"></div>
+        </section>
+      </div>
+    </main>
+
+    <script type="module" src="./pipeline.js"></script>
+  </body>
+</html>

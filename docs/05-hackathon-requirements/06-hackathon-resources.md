@@ -25,9 +25,10 @@ coding assistant. [developer.amazon.com/docs/vega/0.24/mcp-server](https://devel
 **This is the tool that should have been used before concluding what D021 concluded.**
 Decision D021 states that no documented Vega OS API supports a system-level or
 picture-in-picture overlay, verified across 38 documented APIs — and that finding is why
-FR12 and FR14 are recorded as *not implementable as written* rather than merely
-unfinished. If that conclusion is wrong, the project's largest documented gap is not a
-platform limit, and two requirements are winnable.
+FR12 was recorded as *not implementable as written* rather than merely unfinished. (FR14
+was on that list too until D034 retired it: the 15-second auto-dismiss is implemented in
+the `firetv/` client.) If that conclusion is wrong, the project's largest documented gap
+is not a platform limit, and the requirement is winnable.
 
 An official tool that searches the Vega documentation is the cheapest available way to
 test it. **Highest-value item on this page.** Not done: the finding was researched by
@@ -45,7 +46,7 @@ track level, from a second source.
 
 The consequence was missing from this file until now, and it is the sharpest open
 question in the project: **D021 was researched against Vega OS alone, and Vega is a
-choice.** If the app targets Fire OS instead, the surface that blocks FR12 and FR14
+choice.** If the app targets Fire OS instead, the surface that blocks FR12
 exists. `hello-world-fire-tv` — the native Kotlin / Jetpack Compose path — is then the
 relevant starter rather than any of the Vega samples.
 
@@ -97,17 +98,18 @@ a route to retiring all of them.
 Not verified: whether account creation is instant, whether a physical device is still
 required, or whether the Vision APIs differ from the published reference.
 
-## Credits — a fourth form URL, which does not resolve the question
+## Credits — resolved: the pool is exhausted (Entry 27)
 
 > "Request $150 in AWS credits through the credit request form." —
 > [forms.gle/GaHFxSbBQNG9Kti6A](https://forms.gle/GaHFxSbBQNG9Kti6A)
 
-This adds a **fourth** candidate to an item already recorded as **NOT FOUND** in
+This was a **fourth** candidate for an item once recorded as **NOT FOUND** in
 [01-official-requirements](./01-official-requirements.md), where the Rules, this page, and
-the FAQ each linked a different form. It does not resolve which is live.
-
-**The deadline does not move: Oct 21, 12pm PT**, two days before submission closes. Use
-the Rules-page link and submit early, exactly as that page already advises.
+the FAQ each linked a different form. The four forms proved to be the same dead end: every
+one now resolves to a notice that the credit pool is exhausted, so which link is "live" no
+longer matters — **Friction Log Entry 27**. The Rules' **Oct 21, 12pm PT** deadline is moot
+with it. The $15K/$5K prize credits in the prize table are unaffected: those are paid to a
+winner and were never routed through this form.
 
 ## Ring track — the prioritised categories this project already matches
 
@@ -139,10 +141,11 @@ Remaining Ring resources not otherwise listed here:
 - [Ring API reference](https://developer.amazon.com/docs/ring/api-documentation.html) —
   the source `04-ring-api-findings` was verified against.
 
-## Fire TV samples — relevant because FR12–FR15 are unbuilt
+## Fire TV samples — relevant because FR12 alone is unbuilt
 
-`firetv/` does not exist, and D021 is what blocks the interesting part of it. If the
-finding above is overturned, these are the starting points:
+`firetv/` now exists as the dependency-free WebView overlay client (D034), but D021 is
+what blocks the interesting part of it. If the finding above is overturned, these are the
+starting points:
 
 | Sample | Why it might matter here |
 |---|---|
@@ -157,8 +160,8 @@ finding above is overturned, these are the starting points:
 The Fire TV track's prioritised categories include **computer vision** and **multi-modal
 UX**, which is what this project actually is — relevant to the argument in
 [03-doc-conflicts](./03-doc-conflicts.md) conflict 2 that Fire TV first place pays
-$13,000 more than Ring and the invented "one app, one primary track" rule is steering
-the project away from it.
+$13,000 more than Ring. The invented "one app, one primary track" rule that used to block
+that entry was removed on 2026-10-16, and the project now enters Ring **and** Fire TV.
 
 The page states the tools are free and public. **A free React Native e-book** is also
 listed: [The Ultimate Guide to React Native TV Development](https://www.callstack.com/ebooks/the-ultimate-guide-to-react-native-tv-development),
