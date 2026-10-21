@@ -21,6 +21,7 @@ coverage/
 
 # Local agent scratch
 loop-results.tsv
+*.mp4
 .mimosa/
 .freebuff/
 .v2c/

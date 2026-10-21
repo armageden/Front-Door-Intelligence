@@ -10,6 +10,10 @@ snapshot and writes one sentence — *"A delivery driver places a medium box by 
 which appears on your Fire TV within seconds. No notification badge telling you
 *something happened*. A sentence telling you **what**.
 
+- **Demo Video:** [YouTube Walkthrough (2:55)](https://youtu.be/Pg0fJis0g5o)
+- **Live Interactive Demo:** [https://armageden.github.io/Front-Door-Intelligence/](https://armageden.github.io/Front-Door-Intelligence/)
+- **Open Source Companion:** [`ring-webhook-verifier-`](https://github.com/armageden/ring-webhook-verifier-)
+
 ---
 
 ## Status — please read this before judging the demo

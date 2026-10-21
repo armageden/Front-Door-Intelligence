@@ -1,8 +1,6 @@
 **Back:** [00-overview](./00-overview.md)
 
-**Verified against:** `prd.md` §1 and §13, read directly. Every "Present in repo" value was re-checked against the working tree on 2026-10-04: `README.md`, `LICENSE`, and `FRICTION_LOG.md` exist and are readable; `web/dist/` contains a built demo page; the five gates were run that day. The three self-invalidating declarations that used to head this page were retired as each file was created. Still unknowable from the working tree: whether the GitHub repo is public, and every external deliverable.
-
-
+**Verified against:** `prd.md` §1 and §13, read directly. Every "Present in repo" value was re-checked against the working tree on 2026-10-04, and re-verified on 2026-10-21: `README.md`, `LICENSE`, and `FRICTION_LOG.md` exist and are readable; `web/dist/` contains a built demo page; the demo video was recorded and published to YouTube on 2026-10-21; the companion repository `ring-webhook-verifier-` was published to GitHub.
 
 # Submission checklist and PRD change discipline
 
@@ -10,18 +8,18 @@ Source: `prd.md` §13 (checklist) and §1 (change log).
 
 ## Submission checklist
 
-Reproduced from `prd.md` §13. "Present" is checked against the working tree.
+Reproduced from `prd.md` §13. "Present" is checked against the working tree and live submission deliverables.
 
-| Item | Present in repo |
+| Item | Present in repo / live |
 |---|---|
-| Public GitHub repo with MIT License in About section | **Partly** — `LICENSE` exists; whether the repo is public and the license is set in the About section is a GitHub setting, not a file |
+| Public GitHub repo with MIT License in About section | **Yes** — public at `https://github.com/armageden/Front-Door-Intelligence` with MIT License detected |
 | README with setup instructions and environment variable template | **Yes** — `README.md` covers setup, the command table, and every variable; `.env.example` is the committed template |
-| Demo video < 3 minutes (uploaded, public) | No — external deliverable |
-| Devpost submission form filled (tracks: Ring, Fire TV) | No — external deliverable |
+| Demo video < 3 minutes (uploaded, public) | **Yes** — uploaded to YouTube: [https://youtu.be/Pg0fJis0g5o](https://youtu.be/Pg0fJis0g5o) (2:55) |
+| Devpost submission form filled (tracks: Ring, Fire TV) | **Ready** — complete submission text prepared in submission package |
 | Friction Log in repo root | **Yes** — `FRICTION_LOG.md`, 27 entries in the six-field shape |
-| Working demo accessible to judges | **Yes, locally and by pipeline** — `web/dist/demo.html` and `firetv/dist/overlay.html` render fixture data through the production code with no backend (D032, D034); both were rendered and exercised in a real browser on 2026-10-04. `.github/workflows/demos.yml` publishes both, with a landing page, to GitHub Pages on every push to `main` (D035) — one manual Pages enable plus a push away from a public URL. The backend itself is not deployed, so the demos carry fixture data by design |
-| AWS Builder mini-challenge: documented Bedrock integration | **Partly** — `src/lib/bedrockClient.ts` is written and documented in [04-bedrock-client](../04-libraries/04-bedrock-client.md), but the integration has never run against Bedrock |
-| Open Source mini-challenge: repo is public + MIT licensed | **Partly** — `LICENSE` exists; the rules require a *second*, distinct repository alongside the primary submission, and none exists (Friction Log Entry 18) |
+| Working demo accessible to judges | **Yes, locally and live on GitHub Pages** — `web/dist/demo.html` and `firetv/dist/overlay.html` render fixture data through production code; published to GitHub Pages at `https://armageden.github.io/Front-Door-Intelligence/` |
+| AWS Builder mini-challenge: documented Bedrock integration | **Partly** — `src/lib/bedrockClient.ts` is written and documented in [04-bedrock-client](../04-libraries/04-bedrock-client.md), but the integration has never run against live Bedrock |
+| Open Source mini-challenge: repo is public + MIT licensed | **Yes** — standalone companion repository published and public: [`ring-webhook-verifier-`](https://github.com/armageden/ring-webhook-verifier-) (0 dependencies, 8 passing tests, MIT) |
 
 The remote is `https://github.com/armageden/Front-Door-Intelligence.git`. Whether it is
 public is not something the working tree can tell us; the file-level gaps are real
